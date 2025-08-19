@@ -216,6 +216,12 @@ func (v *DefaultKeyValidator) ValidateKey(key *models.APIKey, group *models.Grou
 	return nil
 }
 
+// ValidateSingleKey 验证单个密钥并返回布尔结果
+func (v *DefaultKeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group) (bool, error) {
+	err := v.ValidateKey(key, group)
+	return err == nil, err
+}
+
 // ValidateBatch 批量验证密钥
 func (v *DefaultKeyValidator) ValidateBatch(keys []*models.APIKey, group *models.Group) []ValidationResult {
 	results := make([]ValidationResult, len(keys))

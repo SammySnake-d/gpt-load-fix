@@ -164,6 +164,7 @@ type EventHandler interface {
 // KeyValidator 定义密钥验证器接口
 type KeyValidator interface {
 	ValidateKey(key *models.APIKey, group *models.Group) error
+	ValidateSingleKey(key *models.APIKey, group *models.Group) (bool, error)
 	ValidateBatch(keys []*models.APIKey, group *models.Group) []ValidationResult
 }
 

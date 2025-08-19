@@ -16,7 +16,7 @@ import (
 type CronChecker struct {
 	DB              *gorm.DB
 	SettingsManager *config.SystemSettingsManager
-	Validator       *KeyValidator
+	Validator       KeyValidator
 	stopChan        chan struct{}
 	wg              sync.WaitGroup
 }
@@ -25,7 +25,7 @@ type CronChecker struct {
 func NewCronChecker(
 	db *gorm.DB,
 	settingsManager *config.SystemSettingsManager,
-	validator *KeyValidator,
+	validator KeyValidator,
 ) *CronChecker {
 	return &CronChecker{
 		DB:              db,

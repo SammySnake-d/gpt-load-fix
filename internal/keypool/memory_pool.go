@@ -218,6 +218,49 @@ func (p *MemoryLayeredPool) Health() error {
 	return nil
 }
 
+// getGroupConfig 获取分组配置
+func (p *MemoryLayeredPool) getGroupConfig(groupID uint) *PoolConfig {
+	p.configMu.RLock()
+	config, exists := p.groupConfigs[groupID]
+	p.configMu.RUnlock()
+
+	if exists {
+		return config
+	}
+
+	// 使用默认配置
+	defaultConfig := DefaultPoolConfig(groupID)
+
+	p.configMu.Lock()
+	p.groupConfigs[groupID] = defaultConfig
+	p.configMu.Unlock()
+
+	return defaultConfig
+}
+
+// UpdateConfig 更新分组配置
+func (p *MemoryLayeredPool) UpdateConfig(groupID uint, config *PoolConfig) error {
+	if config == nil {
+		return NewPoolError(ErrorTypeConfiguration, "NIL_CONFIG", "Config cannot be nil")
+	}
+
+	config.GroupID = groupID
+
+	p.configMu.Lock()
+	p.groupConfigs[groupID] = config
+	p.configMu.Unlock()
+
+	logrus.WithField("groupID", groupID).Info("Memory pool configuration updated")
+
+	return nil
+}
+
+// GetConfig 获取分组配置
+func (p *MemoryLayeredPool) GetConfig(groupID uint) (*PoolConfig, error) {
+	config := p.getGroupConfig(groupID)
+	return config, nil
+}
+
 // SelectKey 选择一个可用的密钥
 func (p *MemoryLayeredPool) SelectKey(groupID uint) (*models.APIKey, error) {
 	startTime := time.Now()
@@ -612,6 +655,62 @@ func (p *MemoryLayeredPool) RecoverCooledKeys(groupID uint) (int, error) {
 	return recoveredCount, nil
 }
 
+// ValidateKeys 验证密钥
+func (p *MemoryLayeredPool) ValidateKeys(groupID uint, keyIDs []uint) error {
+	if p.validator == nil {
+		return NewPoolError(ErrorTypeConfiguration, "NO_VALIDATOR", "No validator configured")
+	}
+
+	// 获取分组信息
+	var group models.Group
+	if err := p.db.First(&group, groupID).Error; err != nil {
+		return NewPoolErrorWithCause(ErrorTypeStorage, "GROUP_NOT_FOUND", "Failed to find group", err)
+	}
+
+	// 批量验证密钥
+	var keys []models.APIKey
+	if err := p.db.Where("id IN ? AND group_id = ?", keyIDs, groupID).Find(&keys).Error; err != nil {
+		return NewPoolErrorWithCause(ErrorTypeStorage, "KEYS_NOT_FOUND", "Failed to find keys", err)
+	}
+
+	// 转换为指针切片
+	keyPtrs := make([]*models.APIKey, len(keys))
+	for i := range keys {
+		keyPtrs[i] = &keys[i]
+	}
+
+	// 执行批量验证
+	results := p.validator.ValidateBatch(keyPtrs, &group)
+
+	// 处理验证结果
+	invalidKeys := make([]uint, 0)
+	for _, result := range results {
+		if !result.Valid {
+			invalidKeys = append(invalidKeys, result.KeyID)
+		}
+	}
+
+	// 移除无效密钥
+	if len(invalidKeys) > 0 {
+		if err := p.RemoveKeys(groupID, invalidKeys); err != nil {
+			logrus.WithFields(logrus.Fields{
+				"groupID":     groupID,
+				"invalidKeys": invalidKeys,
+				"error":       err,
+			}).Warn("Failed to remove invalid keys")
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"groupID":    groupID,
+		"totalKeys":  len(keyIDs),
+		"validKeys":  len(keyIDs) - len(invalidKeys),
+		"invalidKeys": len(invalidKeys),
+	}).Info("Key validation completed")
+
+	return nil
+}
+
 // GetPoolStats 获取池统计信息
 func (p *MemoryLayeredPool) GetPoolStats(groupID uint) (*PoolStats, error) {
 	stats := &PoolStats{
@@ -847,6 +946,137 @@ func (p *MemoryLayeredPool) TriggerManualRecovery(groupID uint, keyIDs []uint) e
 	}).Info("Manual recovery triggered")
 
 	return nil
+}
+
+// getRedisKey 生成内存存储键名（兼容Redis键名格式）
+func (p *MemoryLayeredPool) getRedisKey(groupID uint, poolType PoolType) string {
+	prefix := "memory_pool:"
+	if p.memoryConfig != nil {
+		// 使用配置的前缀，如果没有则使用默认值
+		prefix = "memory_pool:"
+	}
+	return fmt.Sprintf("%sgroup:%d:%s", prefix, groupID, poolType)
+}
+
+// getKeyDetailsKey 生成密钥详情键名
+func (p *MemoryLayeredPool) getKeyDetailsKey(keyID uint) string {
+	prefix := "memory_pool:"
+	if p.memoryConfig != nil {
+		prefix = "memory_pool:"
+	}
+	return fmt.Sprintf("%skey:%d", prefix, keyID)
+}
+
+// syncKeyDetailsToRedis 同步密钥详情到内存存储
+func (p *MemoryLayeredPool) syncKeyDetailsToRedis(keyID, groupID uint) error {
+	var key models.APIKey
+	if err := p.db.First(&key, keyID).Error; err != nil {
+		return err
+	}
+
+	// 构建密钥详情
+	details := map[string]interface{}{
+		"id":         key.ID,
+		"group_id":   key.GroupID,
+		"key_value":  key.KeyValue,
+		"status":     key.Status,
+		"created_at": key.CreatedAt,
+		"updated_at": key.UpdatedAt,
+	}
+
+	// 存储到分片内存存储
+	detailsKey := p.getKeyDetailsKey(keyID)
+	return p.shardedStore.HSet(detailsKey, details)
+}
+
+// maintenanceLoop 维护循环
+func (p *MemoryLayeredPool) maintenanceLoop() {
+	defer p.wg.Done()
+
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case <-ticker.C:
+			p.performMaintenance()
+		}
+	}
+}
+
+// performMaintenance 执行维护任务
+func (p *MemoryLayeredPool) performMaintenance() {
+	// 获取所有分组
+	var groups []models.Group
+	if err := p.db.Find(&groups).Error; err != nil {
+		logrus.WithError(err).Error("Failed to load groups for maintenance")
+		return
+	}
+
+	for _, group := range groups {
+		// 恢复冷却的密钥
+		if recovered, err := p.RecoverCooledKeys(group.ID); err != nil {
+			logrus.WithFields(logrus.Fields{
+				"groupID": group.ID,
+				"error":   err,
+			}).Error("Failed to recover cooled keys")
+		} else if recovered > 0 {
+			logrus.WithFields(logrus.Fields{
+				"groupID":   group.ID,
+				"recovered": recovered,
+			}).Info("Recovered cooled keys")
+		}
+
+		// 补充池
+		if err := p.RefillPools(group.ID); err != nil {
+			logrus.WithFields(logrus.Fields{
+				"groupID": group.ID,
+				"error":   err,
+			}).Error("Failed to refill pools")
+		}
+	}
+}
+
+// cacheCleanupLoop 缓存清理循环
+func (p *MemoryLayeredPool) cacheCleanupLoop() {
+	defer p.wg.Done()
+
+	if p.localCache == nil {
+		return
+	}
+
+	ticker := time.NewTicker(5 * time.Minute) // 每5分钟清理一次
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case <-ticker.C:
+			p.cleanupExpiredCache()
+		}
+	}
+}
+
+// cleanupExpiredCache 清理过期缓存
+func (p *MemoryLayeredPool) cleanupExpiredCache() {
+	if p.localCache == nil {
+		return
+	}
+
+	// 调用本地缓存的清理方法
+	if cache, ok := p.localCache.(*LocalKeyCache); ok {
+		cache.cleanupExpired()
+	}
+}
+
+// Remove 从缓存中移除指定的密钥
+func (c *localKeyCache) Remove(keyID uint) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.cache, keyID)
 }
 
 // UpdateConfig 更新本地缓存配置
