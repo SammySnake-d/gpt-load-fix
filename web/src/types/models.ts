@@ -6,7 +6,7 @@ export interface ApiResponse<T> {
 }
 
 // 密钥状态
-export type KeyStatus = "active" | "invalid" | undefined;
+export type KeyStatus = "active" | "invalid" | "rate_limited" | undefined;
 
 // 数据模型定义
 export interface APIKey {
@@ -213,6 +213,53 @@ export interface RecoveryMetrics {
   success_rate: number;
   avg_recovery_time: number;
   recent_recoveries: RecoveryRecord[];
+}
+
+// 恢复计划
+export interface RecoveryPlan {
+  id: string;
+  group_id: number;
+  key_ids: number[];
+  scheduled_time: string;
+  recovery_type: "manual" | "automatic" | "batch";
+  status: "pending" | "running" | "completed" | "failed";
+  created_at: string;
+  updated_at: string;
+}
+
+// 批量恢复请求
+export interface BatchRecoveryRequest {
+  recovery_type: "immediate" | "scheduled";
+  scheduled_time?: string;
+  key_selection: "all_rate_limited" | "specific_keys" | "by_criteria";
+  key_ids?: number[];
+  criteria?: {
+    min_failure_count?: number;
+    max_last_used_hours?: number;
+    priority_level?: "high" | "medium" | "low";
+  };
+  recovery_strategy: "conservative" | "aggressive" | "balanced";
+  max_concurrent_recoveries?: number;
+  retry_failed?: boolean;
+}
+
+// 池配置
+export interface PoolConfiguration {
+  group_id: number;
+  validation_pool_size: number;
+  ready_pool_size: number;
+  active_pool_size: number;
+  cooling_pool_size: number;
+  auto_refill_enabled: boolean;
+  auto_refill_threshold: number;
+  recovery_enabled: boolean;
+  recovery_interval_seconds: number;
+  max_concurrent_recoveries: number;
+  recovery_strategy: "conservative" | "aggressive" | "balanced";
+  performance_monitoring_enabled: boolean;
+  health_check_interval_seconds: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // 池统计信息

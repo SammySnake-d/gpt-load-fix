@@ -16,7 +16,6 @@ import {
     NTable,
     NTag
 } from "naive-ui";
-import { computed } from "vue";
 
 interface Props {
   group: Group | null;
@@ -24,17 +23,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-// 计算恢复状态颜色
-const recoveryStatusColors = computed(() => {
-  if (!props.recoveryMetrics) return {};
-
-  const metrics = props.recoveryMetrics;
-  return {
-    successRate: metrics.success_rate > 0.8 ? "success" : metrics.success_rate > 0.6 ? "warning" : "error",
-    avgRecoveryTime: metrics.avg_recovery_time < 300 ? "success" : metrics.avg_recovery_time < 600 ? "warning" : "error",
-  };
-});
 
 // 格式化时间
 function formatTime(seconds: number): string {
