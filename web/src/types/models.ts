@@ -197,3 +197,20 @@ export interface ChartData {
   labels: string[];
   datasets: ChartDataset[];
 }
+
+// 恢复记录
+export interface RecoveryRecord {
+  timestamp: string;
+  key_count: number;
+  recovery_time: number;
+  success: boolean;
+}
+
+// 恢复指标
+export interface RecoveryMetrics {
+  total_recoveries: number;
+  successful_recoveries: number;
+  success_rate: number;
+  avg_recovery_time: number;
+  recent_recoveries: RecoveryRecord[];
+}
