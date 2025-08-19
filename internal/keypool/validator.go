@@ -20,8 +20,8 @@ type KeyTestResult struct {
 	Error    string `json:"error,omitempty"`
 }
 
-// KeyValidator provides methods to validate API keys.
-type KeyValidator struct {
+// KeyValidatorService provides methods to validate API keys.
+type KeyValidatorService struct {
 	DB              *gorm.DB
 	channelFactory  *channel.Factory
 	SettingsManager *config.SystemSettingsManager
@@ -36,9 +36,9 @@ type KeyValidatorParams struct {
 	KeypoolProvider *KeyProvider
 }
 
-// NewKeyValidator creates a new KeyValidator.
-func NewKeyValidator(params KeyValidatorParams) *KeyValidator {
-	return &KeyValidator{
+// NewKeyValidatorService creates a new KeyValidatorService.
+func NewKeyValidatorService(params KeyValidatorParams) *KeyValidatorService {
+	return &KeyValidatorService{
 		DB:              params.DB,
 		channelFactory:  params.ChannelFactory,
 		SettingsManager: params.SettingsManager,
@@ -47,7 +47,7 @@ func NewKeyValidator(params KeyValidatorParams) *KeyValidator {
 }
 
 // ValidateSingleKey performs a validation check on a single API key.
-func (s *KeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group) (bool, error) {
+func (s *KeyValidatorService) ValidateSingleKey(key *models.APIKey, group *models.Group) (bool, error) {
 	if group.EffectiveConfig.AppUrl == "" {
 		group.EffectiveConfig = s.SettingsManager.GetEffectiveConfig(group.Config)
 	}
@@ -81,7 +81,7 @@ func (s *KeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group
 }
 
 // TestMultipleKeys performs a synchronous validation for a list of key values within a specific group.
-func (s *KeyValidator) TestMultipleKeys(group *models.Group, keyValues []string) ([]KeyTestResult, error) {
+func (s *KeyValidatorService) TestMultipleKeys(group *models.Group, keyValues []string) ([]KeyTestResult, error) {
 	results := make([]KeyTestResult, len(keyValues))
 
 	// Find which of the provided keys actually exist in the database for this group

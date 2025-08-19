@@ -18,24 +18,62 @@ const (
 	ProviderTypeEnhanced ProviderType = "enhanced" // 增强提供者
 )
 
+// EnhancedKeyProvider 增强密钥提供者（临时定义以解决编译错误）
+type EnhancedKeyProvider struct {
+	// 基础组件
+	db              *gorm.DB
+	store           store.Store
+	settingsManager *config.SystemSettingsManager
+
+	// 配置
+	config          *EnhancedProviderConfig
+}
+
+// EnhancedProviderConfig 增强提供者配置
+type EnhancedProviderConfig struct {
+	UseLayeredPool      bool                       `json:"use_layered_pool"`
+	PoolImplementation  PoolImplementationType     `json:"pool_implementation"`
+	PoolConfig          *PoolConfig                `json:"pool_config"`
+	RedisConfig         *RedisPoolConfig           `json:"redis_config"`
+	MemoryConfig        *MemoryPoolConfig          `json:"memory_config"`
+	EnableMetrics       bool                       `json:"enable_metrics"`
+	EnableValidation    bool                       `json:"enable_validation"`
+	EnableEvents        bool                       `json:"enable_events"`
+}
+
+// NewEnhancedKeyProvider 创建增强密钥提供者
+func NewEnhancedKeyProvider(
+	db *gorm.DB,
+	store store.Store,
+	settingsManager *config.SystemSettingsManager,
+	config *EnhancedProviderConfig,
+) (*EnhancedKeyProvider, error) {
+	return &EnhancedKeyProvider{
+		db:              db,
+		store:           store,
+		settingsManager: settingsManager,
+		config:          config,
+	}, nil
+}
+
 // GlobalConfig 全局密钥池配置
 type GlobalConfig struct {
 	// 提供者配置
 	ProviderType       ProviderType               `json:"provider_type" yaml:"provider_type"`
 	UseLayeredPool     bool                       `json:"use_layered_pool" yaml:"use_layered_pool"`
 	PoolImplementation PoolImplementationType     `json:"pool_implementation" yaml:"pool_implementation"`
-	
+
 	// 功能开关
 	EnableMetrics      bool                       `json:"enable_metrics" yaml:"enable_metrics"`
 	EnableValidation   bool                       `json:"enable_validation" yaml:"enable_validation"`
 	EnableEvents       bool                       `json:"enable_events" yaml:"enable_events"`
 	EnableAutoRecovery bool                       `json:"enable_auto_recovery" yaml:"enable_auto_recovery"`
-	
+
 	// 池配置
 	DefaultPoolConfig  *PoolConfig                `json:"default_pool_config" yaml:"default_pool_config"`
 	RedisConfig        *RedisPoolConfig           `json:"redis_config" yaml:"redis_config"`
 	MemoryConfig       *MemoryPoolConfig          `json:"memory_config" yaml:"memory_config"`
-	
+
 	// 性能配置
 	BatchSize          int                        `json:"batch_size" yaml:"batch_size"`
 	MaxConcurrency     int                        `json:"max_concurrency" yaml:"max_concurrency"`
@@ -67,7 +105,7 @@ type ProviderManager struct {
 	db              *gorm.DB
 	store           store.Store
 	settingsManager *config.SystemSettingsManager
-	
+
 	// 提供者实例
 	legacyProvider   *KeyProvider
 	enhancedProvider *EnhancedKeyProvider
@@ -81,23 +119,23 @@ func NewProviderManager(
 	settingsManager *config.SystemSettingsManager,
 	config *GlobalConfig,
 ) (*ProviderManager, error) {
-	
+
 	if config == nil {
 		config = DefaultGlobalConfig()
 	}
-	
+
 	manager := &ProviderManager{
 		config:          config,
 		db:              db,
 		store:           store,
 		settingsManager: settingsManager,
 	}
-	
+
 	// 初始化提供者
 	if err := manager.initializeProviders(); err != nil {
 		return nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
-	
+
 	return manager, nil
 }
 
@@ -105,7 +143,7 @@ func NewProviderManager(
 func (m *ProviderManager) initializeProviders() error {
 	// 始终创建传统提供者作为回退
 	m.legacyProvider = NewProvider(m.db, m.store, m.settingsManager)
-	
+
 	// 根据配置决定是否创建增强提供者
 	if m.config.ProviderType == ProviderTypeEnhanced || m.config.UseLayeredPool {
 		enhancedConfig := &EnhancedProviderConfig{
@@ -118,7 +156,7 @@ func (m *ProviderManager) initializeProviders() error {
 			EnableValidation:    m.config.EnableValidation,
 			EnableEvents:        m.config.EnableEvents,
 		}
-		
+
 		enhancedProvider, err := NewEnhancedKeyProvider(
 			m.db, m.store, m.settingsManager, enhancedConfig)
 		if err != nil {
@@ -126,16 +164,16 @@ func (m *ProviderManager) initializeProviders() error {
 			m.currentProvider = m.legacyProvider
 			return nil
 		}
-		
+
 		m.enhancedProvider = enhancedProvider
 		m.currentProvider = m.enhancedProvider
-		
+
 		logrus.Info("Initialized enhanced key provider")
 	} else {
 		m.currentProvider = m.legacyProvider
 		logrus.Info("Initialized legacy key provider")
 	}
-	
+
 	return nil
 }
 
@@ -168,13 +206,13 @@ func (m *ProviderManager) SwitchToEnhanced() error {
 			EnableValidation:    m.config.EnableValidation,
 			EnableEvents:        m.config.EnableEvents,
 		}
-		
+
 		enhancedProvider, err := NewEnhancedKeyProvider(
 			m.db, m.store, m.settingsManager, enhancedConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create enhanced provider: %w", err)
 		}
-		
+
 		m.enhancedProvider = enhancedProvider
 	} else if !m.enhancedProvider.IsUsingLayeredPool() {
 		// 切换现有增强提供者到分层池模式
@@ -188,16 +226,16 @@ func (m *ProviderManager) SwitchToEnhanced() error {
 			EnableValidation:    m.config.EnableValidation,
 			EnableEvents:        m.config.EnableEvents,
 		}
-		
+
 		if err := m.enhancedProvider.SwitchToLayeredPool(enhancedConfig); err != nil {
 			return fmt.Errorf("failed to switch to layered pool: %w", err)
 		}
 	}
-	
+
 	m.currentProvider = m.enhancedProvider
 	m.config.ProviderType = ProviderTypeEnhanced
 	m.config.UseLayeredPool = true
-	
+
 	logrus.Info("Switched to enhanced provider")
 	return nil
 }
@@ -209,11 +247,11 @@ func (m *ProviderManager) SwitchToLegacy() error {
 			logrus.WithError(err).Warn("Failed to switch enhanced provider to legacy mode")
 		}
 	}
-	
+
 	m.currentProvider = m.legacyProvider
 	m.config.ProviderType = ProviderTypeLegacy
 	m.config.UseLayeredPool = false
-	
+
 	logrus.Info("Switched to legacy provider")
 	return nil
 }
@@ -223,14 +261,14 @@ func (m *ProviderManager) UpdateConfig(newConfig *GlobalConfig) error {
 	if newConfig == nil {
 		return fmt.Errorf("config cannot be nil")
 	}
-	
+
 	oldConfig := m.config
 	m.config = newConfig
-	
+
 	// 检查是否需要切换提供者
-	if oldConfig.ProviderType != newConfig.ProviderType || 
+	if oldConfig.ProviderType != newConfig.ProviderType ||
 	   oldConfig.UseLayeredPool != newConfig.UseLayeredPool {
-		
+
 		if newConfig.ProviderType == ProviderTypeEnhanced || newConfig.UseLayeredPool {
 			if err := m.SwitchToEnhanced(); err != nil {
 				m.config = oldConfig // 回滚配置
@@ -243,7 +281,7 @@ func (m *ProviderManager) UpdateConfig(newConfig *GlobalConfig) error {
 			}
 		}
 	}
-	
+
 	logrus.Info("Provider configuration updated")
 	return nil
 }
@@ -262,11 +300,11 @@ func (m *ProviderManager) GetStatus() map[string]interface{} {
 		"legacy_available":  m.legacyProvider != nil,
 		"enhanced_available": m.enhancedProvider != nil,
 	}
-	
+
 	if m.enhancedProvider != nil {
 		status["enhanced_using_layered_pool"] = m.enhancedProvider.IsUsingLayeredPool()
 	}
-	
+
 	return status
 }
 
@@ -275,7 +313,7 @@ func (m *ProviderManager) HealthCheck() error {
 	if m.currentProvider == nil {
 		return fmt.Errorf("no active provider")
 	}
-	
+
 	// 检查增强提供者的健康状态
 	if m.enhancedProvider != nil && m.currentProvider == m.enhancedProvider {
 		if m.enhancedProvider.layeredPool != nil {
@@ -284,22 +322,22 @@ func (m *ProviderManager) HealthCheck() error {
 			}
 		}
 	}
-	
+
 	// 检查存储连接
 	if err := m.store.Set("health_check", []byte("ok"), 10*time.Second); err != nil {
 		return fmt.Errorf("store health check failed: %w", err)
 	}
-	
+
 	// 检查数据库连接
 	sqlDB, err := m.db.DB()
 	if err != nil {
 		return fmt.Errorf("database connection failed: %w", err)
 	}
-	
+
 	if err := sqlDB.Ping(); err != nil {
 		return fmt.Errorf("database ping failed: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -310,20 +348,20 @@ func (m *ProviderManager) Close() error {
 			logrus.WithError(err).Warn("Failed to close enhanced provider")
 		}
 	}
-	
+
 	return nil
 }
 
 // LoadConfigFromSettings 从系统设置加载配置
 func LoadConfigFromSettings(settingsManager *config.SystemSettingsManager) (*GlobalConfig, error) {
 	config := DefaultGlobalConfig()
-	
+
 	// 从系统设置中读取配置
 	// 这里可以根据实际的设置管理器实现来读取配置
 	// 例如：
 	// if value := settingsManager.Get("keypool.provider_type"); value != "" {
 	//     config.ProviderType = ProviderType(value)
 	// }
-	
+
 	return config, nil
 }

@@ -22,26 +22,26 @@ type PoolManager struct {
 	poolsMu     sync.RWMutex
 
 	// 默认池类型
-	defaultPoolType PoolType
+	defaultPoolType ManagerPoolType
 
 	// 性能优化组件
 	optimizer     *PerformanceOptimizer
 	configApplier *ConfigApplier
 }
 
-// PoolType 池类型
-type PoolType string
+// ManagerPoolType 管理器池类型（重命名以避免与 layered_pool.go 中的冲突）
+type ManagerPoolType string
 
 const (
-	PoolTypeRedis  PoolType = "redis"
-	PoolTypeMemory PoolType = "memory"
+	ManagerPoolTypeRedis  ManagerPoolType = "redis"
+	ManagerPoolTypeMemory ManagerPoolType = "memory"
 )
 
 // NewPoolManager 创建池管理器
 func NewPoolManager(db *gorm.DB, redisStore store.Store, config *config.Config) *PoolManager {
-	defaultType := PoolTypeMemory
+	defaultType := ManagerPoolTypeMemory
 	if redisStore != nil {
-		defaultType = PoolTypeRedis
+		defaultType = ManagerPoolTypeRedis
 	}
 
 	manager := &PoolManager{
@@ -178,18 +178,18 @@ func (pm *PoolManager) createMemoryPool(group *models.Group) (LayeredKeyPool, er
 }
 
 // determinePoolType 确定池类型
-func (pm *PoolManager) determinePoolType(group *models.Group) PoolType {
+func (pm *PoolManager) determinePoolType(group *models.Group) ManagerPoolType {
 	// 检查分组配置中是否指定了池类型
 	if poolTypeStr, exists := group.Config["pool_type"]; exists {
 		if poolType, ok := poolTypeStr.(string); ok {
 			switch poolType {
 			case "redis":
 				if pm.redisStore != nil {
-					return PoolTypeRedis
+					return ManagerPoolTypeRedis
 				}
 				logrus.WithField("groupID", group.ID).Warn("Redis pool requested but Redis store not available, falling back to memory pool")
 			case "memory":
-				return PoolTypeMemory
+				return ManagerPoolTypeMemory
 			}
 		}
 	}
@@ -374,7 +374,7 @@ func (pm *PoolManager) StopOptimizer() error {
 }
 
 // GetOptimalConfig 获取当前最优配置
-func (pm *PoolManager) GetOptimalConfig() *OptimalConfig {
+func (pm *PoolManager) GetOptimalConfig() *OptimizerOptimalConfig {
 	if pm.optimizer != nil {
 		return pm.optimizer.GetCurrentConfig()
 	}
@@ -382,7 +382,7 @@ func (pm *PoolManager) GetOptimalConfig() *OptimalConfig {
 }
 
 // ApplyOptimalConfig 应用最优配置到指定分组
-func (pm *PoolManager) ApplyOptimalConfig(groupID uint, config *OptimalConfig) error {
+func (pm *PoolManager) ApplyOptimalConfig(groupID uint, config *OptimizerOptimalConfig) error {
 	if pm.configApplier != nil {
 		return pm.configApplier.ApplyOptimalConfig(groupID, config)
 	}

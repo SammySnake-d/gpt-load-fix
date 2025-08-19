@@ -14,20 +14,20 @@ import (
 type PerformanceOptimizer struct {
 	// 配置
 	config *OptimizerConfig
-	
+
 	// 运行时状态
 	ctx    context.Context
 	cancel context.CancelFunc
 	mu     sync.RWMutex
-	
+
 	// 优化历史
 	optimizationHistory []*OptimizationResult
-	currentConfig       *OptimalConfig
-	
+	currentConfig       *OptimizerOptimalConfig
+
 	// 监控组件
 	performanceMonitor *PerformanceMonitor
 	tuner             *PerformanceTuner
-	
+
 	// 自适应调整
 	adaptiveEnabled    bool
 	lastOptimization   time.Time
@@ -40,18 +40,18 @@ type OptimizerConfig struct {
 	EnableAutoOptimization bool          `json:"enable_auto_optimization"` // 启用自动优化
 	OptimizationInterval   time.Duration `json:"optimization_interval"`    // 优化间隔
 	MinOptimizationGap     time.Duration `json:"min_optimization_gap"`     // 最小优化间隔
-	
+
 	// 性能阈值
 	ThroughputThreshold    float64 `json:"throughput_threshold"`     // 吞吐量阈值
 	LatencyThreshold       int64   `json:"latency_threshold"`        // 延迟阈值(ms)
 	ErrorRateThreshold     float64 `json:"error_rate_threshold"`     // 错误率阈值
 	MemoryUsageThreshold   int64   `json:"memory_usage_threshold"`   // 内存使用阈值(MB)
-	
+
 	// 优化策略
 	AggressiveOptimization bool    `json:"aggressive_optimization"`  // 激进优化模式
 	ConservativeMode       bool    `json:"conservative_mode"`        // 保守模式
 	AdaptiveTuning         bool    `json:"adaptive_tuning"`          // 自适应调优
-	
+
 	// 资源限制
 	MaxConcurrentTests     int     `json:"max_concurrent_tests"`     // 最大并发测试数
 	MaxMemoryUsage         int64   `json:"max_memory_usage"`         // 最大内存使用(MB)
@@ -61,8 +61,8 @@ type OptimizerConfig struct {
 // OptimizationResult 优化结果
 type OptimizationResult struct {
 	Timestamp       time.Time         `json:"timestamp"`
-	PreviousConfig  *OptimalConfig    `json:"previous_config"`
-	NewConfig       *OptimalConfig    `json:"new_config"`
+	PreviousConfig  *OptimizerOptimalConfig    `json:"previous_config"`
+	NewConfig       *OptimizerOptimalConfig    `json:"new_config"`
 	Improvement     *ImprovementStats `json:"improvement"`
 	Duration        time.Duration     `json:"duration"`
 	Success         bool              `json:"success"`
@@ -77,29 +77,29 @@ type ImprovementStats struct {
 	OverallScore          float64 `json:"overall_score"`           // 总体得分改进
 }
 
-// OptimalConfig 最优配置
-type OptimalConfig struct {
+// OptimizerOptimalConfig 优化器最优配置（重命名以避免与 performance_tuner.go 中的冲突）
+type OptimizerOptimalConfig struct {
 	// 分片配置
 	ShardCount       int     `json:"shard_count"`
 	CacheSize        int     `json:"cache_size"`
 	BatchSize        int     `json:"batch_size"`
-	
+
 	// 并发配置
 	MaxConcurrency   int     `json:"max_concurrency"`
 	WorkerPoolSize   int     `json:"worker_pool_size"`
 	QueueSize        int     `json:"queue_size"`
-	
+
 	// 超时配置
 	SelectTimeout    time.Duration `json:"select_timeout"`
 	ReturnTimeout    time.Duration `json:"return_timeout"`
 	RecoveryTimeout  time.Duration `json:"recovery_timeout"`
-	
+
 	// 性能指标
 	Score            float64 `json:"score"`
 	Throughput       float64 `json:"throughput"`
 	AvgLatency       int64   `json:"avg_latency"`
 	MemoryEfficiency float64 `json:"memory_efficiency"`
-	
+
 	// 元数据
 	GeneratedAt      time.Time `json:"generated_at"`
 	Environment      string    `json:"environment"`
@@ -131,9 +131,9 @@ func NewPerformanceOptimizer(config *OptimizerConfig, monitor *PerformanceMonito
 	if config == nil {
 		config = DefaultOptimizerConfig()
 	}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	optimizer := &PerformanceOptimizer{
 		config:              config,
 		ctx:                 ctx,
@@ -143,7 +143,7 @@ func NewPerformanceOptimizer(config *OptimizerConfig, monitor *PerformanceMonito
 		adaptiveEnabled:     config.AdaptiveTuning,
 		lastOptimization:    time.Now(),
 	}
-	
+
 	// 创建性能调优器
 	tunerConfig := &TuningConfig{
 		TestDuration:    30 * time.Second,
@@ -153,10 +153,10 @@ func NewPerformanceOptimizer(config *OptimizerConfig, monitor *PerformanceMonito
 		BatchSizes:      []int{10, 50, 100, 200},
 	}
 	optimizer.tuner = NewPerformanceTuner(tunerConfig)
-	
+
 	// 生成初始最优配置
 	optimizer.currentConfig = optimizer.generateInitialConfig()
-	
+
 	return optimizer
 }
 
@@ -182,7 +182,7 @@ func (o *PerformanceOptimizer) Stop() error {
 func (o *PerformanceOptimizer) optimizationLoop() {
 	ticker := time.NewTicker(o.config.OptimizationInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-o.ctx.Done():
@@ -203,7 +203,7 @@ func (o *PerformanceOptimizer) shouldOptimize() bool {
 	if time.Since(o.lastOptimization) < o.config.MinOptimizationGap {
 		return false
 	}
-	
+
 	// 检查性能指标
 	if o.performanceMonitor != nil {
 		metrics := o.performanceMonitor.GetMetrics()
@@ -212,28 +212,28 @@ func (o *PerformanceOptimizer) shouldOptimize() bool {
 			if metrics.Throughput < o.config.ThroughputThreshold {
 				return true
 			}
-			
+
 			// 延迟过高
 			if metrics.AvgLatency > o.config.LatencyThreshold {
 				return true
 			}
-			
+
 			// 错误率过高
 			if metrics.ErrorRate > o.config.ErrorRateThreshold {
 				return true
 			}
 		}
 	}
-	
+
 	// 检查系统资源
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	memoryUsageMB := int64(memStats.HeapInuse / 1024 / 1024)
-	
+
 	if memoryUsageMB > o.config.MemoryUsageThreshold {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -241,15 +241,15 @@ func (o *PerformanceOptimizer) shouldOptimize() bool {
 func (o *PerformanceOptimizer) RunOptimization() error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	
+
 	startTime := time.Now()
 	logrus.Info("Starting performance optimization")
-	
+
 	// 记录当前配置
 	previousConfig := o.currentConfig
-	
+
 	// 运行性能调优
-	newConfig, err := o.tuner.RunFullTuning()
+	tunerConfig, err := o.tuner.RunFullTuning()
 	if err != nil {
 		result := &OptimizationResult{
 			Timestamp:      startTime,
@@ -261,13 +261,16 @@ func (o *PerformanceOptimizer) RunOptimization() error {
 		o.optimizationHistory = append(o.optimizationHistory, result)
 		return fmt.Errorf("performance tuning failed: %w", err)
 	}
-	
+
+	// 转换调优器配置为优化器配置
+	newConfig := o.convertTunerToOptimizerConfig(tunerConfig)
+
 	// 计算改进统计
 	improvement := o.calculateImprovement(previousConfig, newConfig)
-	
+
 	// 决定是否应用新配置
 	shouldApply := o.shouldApplyNewConfig(previousConfig, newConfig, improvement)
-	
+
 	result := &OptimizationResult{
 		Timestamp:      startTime,
 		PreviousConfig: previousConfig,
@@ -276,12 +279,12 @@ func (o *PerformanceOptimizer) RunOptimization() error {
 		Duration:       time.Since(startTime),
 		Success:        shouldApply,
 	}
-	
+
 	if shouldApply {
 		o.currentConfig = newConfig
 		o.lastOptimization = time.Now()
 		o.optimizationCount++
-		
+
 		logrus.WithFields(logrus.Fields{
 			"throughput_improvement": improvement.ThroughputImprovement,
 			"latency_improvement":    improvement.LatencyImprovement,
@@ -292,19 +295,19 @@ func (o *PerformanceOptimizer) RunOptimization() error {
 		result.ErrorMessage = "New configuration did not provide sufficient improvement"
 		logrus.Info("Performance optimization completed but new configuration was not applied")
 	}
-	
+
 	o.optimizationHistory = append(o.optimizationHistory, result)
-	
+
 	// 限制历史记录数量
 	if len(o.optimizationHistory) > 100 {
 		o.optimizationHistory = o.optimizationHistory[len(o.optimizationHistory)-100:]
 	}
-	
+
 	return nil
 }
 
 // calculateImprovement 计算改进统计
-func (o *PerformanceOptimizer) calculateImprovement(previous, new *OptimalConfig) *ImprovementStats {
+func (o *PerformanceOptimizer) calculateImprovement(previous, new *OptimizerOptimalConfig) *ImprovementStats {
 	if previous == nil {
 		return &ImprovementStats{
 			ThroughputImprovement: 0,
@@ -313,24 +316,24 @@ func (o *PerformanceOptimizer) calculateImprovement(previous, new *OptimalConfig
 			OverallScore:          new.Score,
 		}
 	}
-	
+
 	throughputImprovement := 0.0
 	if previous.Throughput > 0 {
 		throughputImprovement = ((new.Throughput - previous.Throughput) / previous.Throughput) * 100
 	}
-	
+
 	latencyImprovement := 0.0
 	if previous.AvgLatency > 0 {
 		latencyImprovement = ((float64(previous.AvgLatency) - float64(new.AvgLatency)) / float64(previous.AvgLatency)) * 100
 	}
-	
+
 	memoryImprovement := 0.0
 	if previous.MemoryEfficiency > 0 {
 		memoryImprovement = ((new.MemoryEfficiency - previous.MemoryEfficiency) / previous.MemoryEfficiency) * 100
 	}
-	
+
 	overallScore := new.Score - previous.Score
-	
+
 	return &ImprovementStats{
 		ThroughputImprovement: throughputImprovement,
 		LatencyImprovement:    latencyImprovement,
@@ -340,39 +343,39 @@ func (o *PerformanceOptimizer) calculateImprovement(previous, new *OptimalConfig
 }
 
 // shouldApplyNewConfig 判断是否应该应用新配置
-func (o *PerformanceOptimizer) shouldApplyNewConfig(previous, new *OptimalConfig, improvement *ImprovementStats) bool {
+func (o *PerformanceOptimizer) shouldApplyNewConfig(previous, new *OptimizerOptimalConfig, improvement *ImprovementStats) bool {
 	if previous == nil {
 		return true
 	}
-	
+
 	// 保守模式下需要显著改进
 	if o.config.ConservativeMode {
 		minImprovement := 5.0 // 5%
 		if o.config.AggressiveOptimization {
 			minImprovement = 1.0 // 1%
 		}
-		
+
 		// 至少一个关键指标有显著改进
 		if improvement.ThroughputImprovement > minImprovement ||
 		   improvement.LatencyImprovement > minImprovement ||
 		   improvement.OverallScore > minImprovement {
 			return true
 		}
-		
+
 		return false
 	}
-	
+
 	// 非保守模式下，任何改进都接受
 	return improvement.OverallScore > 0
 }
 
 // generateInitialConfig 生成初始配置
-func (o *PerformanceOptimizer) generateInitialConfig() *OptimalConfig {
+func (o *PerformanceOptimizer) generateInitialConfig() *OptimizerOptimalConfig {
 	cpuCores := runtime.NumCPU()
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
-	
-	return &OptimalConfig{
+
+	return &OptimizerOptimalConfig{
 		ShardCount:       cpuCores * 2,
 		CacheSize:        10000,
 		BatchSize:        100,
@@ -394,24 +397,53 @@ func (o *PerformanceOptimizer) generateInitialConfig() *OptimalConfig {
 }
 
 // GetCurrentConfig 获取当前最优配置
-func (o *PerformanceOptimizer) GetCurrentConfig() *OptimalConfig {
+func (o *PerformanceOptimizer) GetCurrentConfig() *OptimizerOptimalConfig {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	if o.currentConfig == nil {
 		return o.generateInitialConfig()
 	}
-	
+
 	// 返回配置的副本
 	config := *o.currentConfig
 	return &config
+}
+
+// convertTunerToOptimizerConfig 转换调优器配置为优化器配置
+func (o *PerformanceOptimizer) convertTunerToOptimizerConfig(tunerConfig *TunerOptimalConfig) *OptimizerOptimalConfig {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	return &OptimizerOptimalConfig{
+		// 共同字段
+		ShardCount:       tunerConfig.ShardCount,
+		CacheSize:        tunerConfig.CacheSize,
+		BatchSize:        tunerConfig.BatchSize,
+		Score:            tunerConfig.Score,
+		Throughput:       tunerConfig.Throughput,
+		AvgLatency:       tunerConfig.AvgLatency.Milliseconds(),
+		MemoryEfficiency: tunerConfig.MemoryEfficiency,
+
+		// 默认值
+		MaxConcurrency:   runtime.NumCPU() * 4,
+		WorkerPoolSize:   runtime.NumCPU(),
+		QueueSize:        1000,
+		SelectTimeout:    5 * time.Second,
+		ReturnTimeout:    3 * time.Second,
+		RecoveryTimeout:  30 * time.Second,
+		GeneratedAt:      time.Now(),
+		Environment:      "tuner_converted",
+		CPUCores:         runtime.NumCPU(),
+		AvailableMemory:  int64(memStats.Sys / 1024 / 1024),
+	}
 }
 
 // GetOptimizationHistory 获取优化历史
 func (o *PerformanceOptimizer) GetOptimizationHistory() []*OptimizationResult {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	// 返回历史的副本
 	history := make([]*OptimizationResult, len(o.optimizationHistory))
 	copy(history, o.optimizationHistory)
@@ -422,14 +454,14 @@ func (o *PerformanceOptimizer) GetOptimizationHistory() []*OptimizationResult {
 func (o *PerformanceOptimizer) UpdateConfig(config *OptimizerConfig) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	
+
 	if config == nil {
 		return fmt.Errorf("config cannot be nil")
 	}
-	
+
 	o.config = config
 	o.adaptiveEnabled = config.AdaptiveTuning
-	
+
 	logrus.Info("Performance optimizer configuration updated")
 	return nil
 }
@@ -438,7 +470,7 @@ func (o *PerformanceOptimizer) UpdateConfig(config *OptimizerConfig) error {
 func (o *PerformanceOptimizer) GetStats() map[string]interface{} {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
-	
+
 	stats := map[string]interface{}{
 		"optimization_count":    o.optimizationCount,
 		"last_optimization":     o.lastOptimization,
@@ -447,13 +479,13 @@ func (o *PerformanceOptimizer) GetStats() map[string]interface{} {
 		"auto_optimization":     o.config.EnableAutoOptimization,
 		"history_count":         len(o.optimizationHistory),
 	}
-	
+
 	// 添加最近的改进统计
 	if len(o.optimizationHistory) > 0 {
 		latest := o.optimizationHistory[len(o.optimizationHistory)-1]
 		stats["latest_optimization"] = latest
 	}
-	
+
 	return stats
 }
 
@@ -466,11 +498,11 @@ func (o *PerformanceOptimizer) ForceOptimization() error {
 func (o *PerformanceOptimizer) ResetToDefaults() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	
+
 	o.currentConfig = o.generateInitialConfig()
 	o.optimizationHistory = make([]*OptimizationResult, 0)
 	o.optimizationCount = 0
 	o.lastOptimization = time.Now()
-	
+
 	logrus.Info("Performance optimizer reset to defaults")
 }
