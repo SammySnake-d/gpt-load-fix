@@ -1152,3 +1152,14 @@ func (s *ShardedMemoryStore) validateConfig(config *ShardedStoreConfig) error {
 
 	return nil
 }
+
+// Close 关闭分片内存存储
+func (s *ShardedMemoryStore) Close() error {
+	// 清理所有分片数据
+	for _, shard := range s.shards {
+		shard.mu.Lock()
+		shard.data = nil
+		shard.mu.Unlock()
+	}
+	return nil
+}

@@ -3,6 +3,7 @@ package keypool
 import (
 	"context"
 	"fmt"
+	"gpt-load/internal/store"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -275,7 +276,7 @@ func (t *PerformanceTuner) warmup(store *ShardedMemoryStore, config *TestConfig)
 }
 
 // runLoadTest 运行负载测试
-func (t *PerformanceTuner) runLoadTest(store *ShardedMemoryStore, config *TestConfig) *PerformanceMetrics {
+func (t *PerformanceTuner) runLoadTest(store *ShardedMemoryStore, config *TestConfig) *TunerPerformanceMetrics {
 	ctx, cancel := context.WithTimeout(context.Background(), t.config.TestDuration)
 	defer cancel()
 

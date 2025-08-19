@@ -6,6 +6,7 @@ import (
 	"gpt-load/internal/models"
 	"gpt-load/internal/store"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -99,9 +100,9 @@ func (pm *PoolManager) createPool(groupID uint) (LayeredKeyPool, error) {
 	var err error
 
 	switch poolType {
-	case PoolTypeRedis:
+	case ManagerPoolTypeRedis:
 		pool, err = pm.createRedisPool(&group)
-	case PoolTypeMemory:
+	case ManagerPoolTypeMemory:
 		pool, err = pm.createMemoryPool(&group)
 	default:
 		return nil, fmt.Errorf("unsupported pool type: %s", poolType)

@@ -145,14 +145,16 @@ func NewPerformanceOptimizer(config *OptimizerConfig, monitor *PerformanceMonito
 	}
 
 	// 创建性能调优器
-	tunerConfig := &TuningConfig{
-		TestDuration:    30 * time.Second,
-		WarmupDuration:  5 * time.Second,
-		ShardCounts:     []int{4, 8, 16, 32},
-		CacheSizes:      []int{1000, 5000, 10000, 20000},
-		BatchSizes:      []int{10, 50, 100, 200},
+	tunerConfig := &TunerConfig{
+		TestDuration:      30 * time.Second,
+		WarmupDuration:    5 * time.Second,
+		ConcurrencyLevels: []int{1, 2, 4, 8, 16},
+		ShardCounts:       []int{4, 8, 16, 32},
+		CacheSizes:        []int{1000, 5000, 10000, 20000},
+		BatchSizes:        []int{10, 50, 100, 200},
+		TestKeyCount:      10000,
 	}
-	optimizer.tuner = NewPerformanceTuner(tunerConfig)
+	optimizer.tuner = NewPerformanceTuner(nil, tunerConfig)
 
 	// 生成初始最优配置
 	optimizer.currentConfig = optimizer.generateInitialConfig()
