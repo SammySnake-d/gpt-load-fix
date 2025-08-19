@@ -90,6 +90,7 @@ const overallHealth = computed(() => {
               <n-statistic
                 label="活跃密钥"
                 :value="poolStats.priority_pool?.active_count || 0"
+                :value="poolStats.priority_pool?.active_count || 0"
                 class="pool-stat"
               />
               <n-progress
@@ -118,6 +119,7 @@ const overallHealth = computed(() => {
             <div class="pool-stats">
               <n-statistic
                 label="就绪密钥"
+                :value="poolStats.ready_pool?.active_count || 0"
                 :value="poolStats.ready_pool?.active_count || 0"
                 class="pool-stat"
               />
@@ -148,6 +150,7 @@ const overallHealth = computed(() => {
               <n-statistic
                 label="使用中密钥"
                 :value="poolStats.active_pool?.active_count || 0"
+                :value="poolStats.active_pool?.active_count || 0"
                 class="pool-stat"
               />
               <n-progress
@@ -176,6 +179,7 @@ const overallHealth = computed(() => {
             <div class="pool-stats">
               <n-statistic
                 label="冷却密钥"
+                :value="poolStats.cooling_pool?.active_count || 0"
                 :value="poolStats.cooling_pool?.active_count || 0"
                 class="pool-stat"
               />

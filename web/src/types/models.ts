@@ -7,6 +7,7 @@ export interface ApiResponse<T> {
 
 // 密钥状态
 export type KeyStatus = "active" | "invalid" | "rate_limited" | undefined;
+export type KeyStatus = "active" | "invalid" | "rate_limited" | undefined;
 
 // 数据模型定义
 export interface APIKey {
