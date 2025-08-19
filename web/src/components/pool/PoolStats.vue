@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import type { Group, PoolStatsResponse } from "@/types/models";
 import {
-    AlertCircleOutline,
-    BarChartOutline,
-    SettingsOutline,
-    SpeedometerOutline,
-    TrendingUpOutline
+  AlertCircleOutline,
+  BarChartOutline,
+  SettingsOutline,
+  SpeedometerOutline,
+  TrendingUpOutline,
 } from "@vicons/ionicons5";
 import {
-    NButton,
-    NCard,
-    NGrid,
-    NGridItem,
-    NIcon,
-    NProgress,
-    NSpace,
-    NTooltip,
-    useMessage,
+  NButton,
+  NCard,
+  NGrid,
+  NGridItem,
+  NIcon,
+  NProgress,
+  NSpace,
+  NTooltip,
+  useMessage,
 } from "naive-ui";
 import { computed } from "vue";
 
@@ -40,11 +40,13 @@ const performanceColors = computed(() => {
       cacheHitRate: "default",
     };
   }
-  
+
   const metrics = props.poolStats.performance_metrics;
   return {
-    errorRate: metrics.error_rate < 0.05 ? "success" : metrics.error_rate < 0.1 ? "warning" : "error",
-    cacheHitRate: metrics.cache_hit_rate > 0.8 ? "success" : metrics.cache_hit_rate > 0.6 ? "warning" : "error",
+    errorRate:
+      metrics.error_rate < 0.05 ? "success" : metrics.error_rate < 0.1 ? "warning" : "error",
+    cacheHitRate:
+      metrics.cache_hit_rate > 0.8 ? "success" : metrics.cache_hit_rate > 0.6 ? "warning" : "error",
   };
 });
 
@@ -102,7 +104,7 @@ function handlePoolRefill() {
               </div>
             </div>
           </n-grid-item>
-          
+
           <n-grid-item>
             <div class="stat-card">
               <div class="stat-header">
@@ -114,7 +116,7 @@ function handlePoolRefill() {
               </div>
             </div>
           </n-grid-item>
-          
+
           <n-grid-item>
             <div class="stat-card">
               <div class="stat-header">
@@ -126,7 +128,7 @@ function handlePoolRefill() {
               </div>
             </div>
           </n-grid-item>
-          
+
           <n-grid-item>
             <div class="stat-card">
               <div class="stat-header">
@@ -157,15 +159,17 @@ function handlePoolRefill() {
               <n-progress
                 type="line"
                 :percentage="poolStats.performance_metrics.error_rate * 100"
-                :color="performanceColors.errorRate === 'success' ? '#10b981' : 
-                       performanceColors.errorRate === 'warning' ? '#f59e0b' : '#ef4444'"
+                :color="
+                  performanceColors.errorRate === 'success'
+                    ? '#10b981'
+                  performanceColors.errorRate === 'warning' ? '#f59e0b' : '#ef4444'"
                 :show-indicator="false"
                 :height="4"
                 style="margin-top: 8px"
               />
             </div>
           </n-grid-item>
-          
+
           <n-grid-item>
             <div class="metric-card">
               <div class="metric-header">
@@ -178,8 +182,10 @@ function handlePoolRefill() {
               <n-progress
                 type="line"
                 :percentage="poolStats.performance_metrics.cache_hit_rate * 100"
-                :color="performanceColors.cacheHitRate === 'success' ? '#10b981' : 
-                       performanceColors.cacheHitRate === 'warning' ? '#f59e0b' : '#ef4444'"
+                :color="
+                  performanceColors.cacheHitRate === 'success'
+                    ? '#10b981'
+                  performanceColors.cacheHitRate === 'warning' ? '#f59e0b' : '#ef4444'"
                 :show-indicator="false"
                 :height="4"
                 style="margin-top: 8px"
@@ -202,7 +208,7 @@ function handlePoolRefill() {
               </div>
             </div>
           </n-grid-item>
-          
+
           <n-grid-item>
             <div class="throughput-card">
               <div class="throughput-label">平均延迟</div>
@@ -212,7 +218,7 @@ function handlePoolRefill() {
               </div>
             </div>
           </n-grid-item>
-          
+
           <n-grid-item>
             <div class="throughput-card">
               <div class="throughput-label">总请求数</div>

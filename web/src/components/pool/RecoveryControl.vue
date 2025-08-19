@@ -18,7 +18,6 @@ import {
     NSelect,
     NSpace,
     NTag,
-    NTooltip,
     useDialog,
     useMessage
 } from "naive-ui";
@@ -55,11 +54,11 @@ const priorityOptions = [
 // 计算恢复建议
 const recoveryRecommendation = computed(() => {
   if (!props.poolStats) return null;
-  
+
   const rateLimitedCount = props.poolStats.rate_limited_keys;
   const activeCount = props.poolStats.active_keys;
   const totalCount = props.poolStats.total_keys;
-  
+
   if (rateLimitedCount === 0) {
     return {
       type: "success",
@@ -67,7 +66,7 @@ const recoveryRecommendation = computed(() => {
       action: null,
     };
   }
-  
+
   if (activeCount < totalCount * 0.3) {
     return {
       type: "error",
@@ -75,7 +74,7 @@ const recoveryRecommendation = computed(() => {
       action: "batch_recovery",
     };
   }
-  
+
   if (rateLimitedCount > 5) {
     return {
       type: "warning",
@@ -83,7 +82,7 @@ const recoveryRecommendation = computed(() => {
       action: "batch_recovery",
     };
   }
-  
+
   return {
     type: "info",
     message: `检测到 ${rateLimitedCount} 个429密钥，可以手动恢复或等待自动恢复`,
@@ -94,7 +93,7 @@ const recoveryRecommendation = computed(() => {
 // 触发批量恢复
 function handleBatchRecovery() {
   if (!props.group) return;
-  
+
   dialog.warning({
     title: "确认批量恢复",
     content: `将尝试恢复最多 ${batchRecoveryForm.value.max_keys} 个429密钥，是否继续？`,
@@ -109,13 +108,13 @@ function handleBatchRecovery() {
 // 触发手动恢复所有429密钥
 function handleRecoverAll() {
   if (!props.group || !props.poolStats) return;
-  
+
   const rateLimitedCount = props.poolStats.rate_limited_keys;
   if (rateLimitedCount === 0) {
     message.warning("当前没有需要恢复的密钥");
     return;
   }
-  
+
   dialog.warning({
     title: "确认恢复所有429密钥",
     content: `将尝试恢复所有 ${rateLimitedCount} 个429密钥，这可能会导致再次触发429错误，是否继续？`,
@@ -131,7 +130,7 @@ function handleRecoverAll() {
 // 快速恢复建议操作
 function handleQuickAction() {
   if (!recoveryRecommendation.value?.action) return;
-  
+
   if (recoveryRecommendation.value.action === "batch_recovery") {
     handleBatchRecovery();
   } else if (recoveryRecommendation.value.action === "manual_recovery") {
@@ -176,7 +175,7 @@ function handleQuickAction() {
                 style="width: 200px"
               />
             </n-form-item>
-            
+
             <n-form-item label="优先级">
               <n-select
                 v-model:value="batchRecoveryForm.priority_level"
@@ -184,7 +183,7 @@ function handleQuickAction() {
                 style="width: 200px"
               />
             </n-form-item>
-            
+
             <n-form-item>
               <n-space>
                 <n-button
@@ -197,7 +196,7 @@ function handleQuickAction() {
                   </template>
                   开始批量恢复
                 </n-button>
-                
+
                 <n-button
                   @click="handleRecoverAll"
                   :disabled="!group || !poolStats?.rate_limited_keys"
@@ -223,21 +222,21 @@ function handleQuickAction() {
             </template>
             总密钥: {{ poolStats.total_keys }}
           </n-tag>
-          
+
           <n-tag type="success">
             <template #icon>
               <n-icon :component="PlayOutline" />
             </template>
             活跃: {{ poolStats.active_keys }}
           </n-tag>
-          
+
           <n-tag type="error" v-if="poolStats.rate_limited_keys > 0">
             <template #icon>
               <n-icon :component="StopOutline" />
             </template>
             429限制: {{ poolStats.rate_limited_keys }}
           </n-tag>
-          
+
           <n-tag type="warning" v-if="poolStats.cooling_pool?.active_count > 0">
             <template #icon>
               <n-icon :component="FlashOutline" />

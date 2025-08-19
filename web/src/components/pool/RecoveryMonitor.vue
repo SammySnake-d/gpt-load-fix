@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import type { Group, RecoveryMetrics } from "@/types/models";
 import {
-    BarChartOutline,
     CheckmarkCircleOutline,
     CloseCircleOutline,
-    RefreshOutline,
-    TimeOutline
+    RefreshOutline
 } from "@vicons/ionicons5";
 import {
     NButton,
@@ -14,7 +12,6 @@ import {
     NGrid,
     NGridItem,
     NIcon,
-    NProgress,
     NStatistic,
     NTable,
     NTag
@@ -31,7 +28,7 @@ const props = defineProps<Props>();
 // 计算恢复状态颜色
 const recoveryStatusColors = computed(() => {
   if (!props.recoveryMetrics) return {};
-  
+
   const metrics = props.recoveryMetrics;
   return {
     successRate: metrics.success_rate > 0.8 ? "success" : metrics.success_rate > 0.6 ? "warning" : "error",
