@@ -128,16 +128,15 @@ func (ca *ConfigApplier) convertToPoolConfig(optimal *OptimizerOptimalConfig) *P
 		ValidationConcurrency: optimal.MaxConcurrency / 2,
 
 		// 恢复配置
-		RecoveryEnabled:       true,
-		RecoveryTimeout:       optimal.RecoveryTimeout,
-		RecoveryBatchSize:     optimal.BatchSize / 2,
-		RecoveryConcurrency:   optimal.WorkerPoolSize,
+		RecoveryInterval:      5 * time.Minute,
+		DefaultCoolingTime:    optimal.RecoveryTimeout,
+		MaxCoolingTime:        optimal.RecoveryTimeout * 2,
 
 		// 性能配置
-		EnableMetrics:         true,
-		EnableEvents:          true,
-		HealthCheckInterval:   30 * time.Second,
-		HealthCheckTimeout:    10 * time.Second,
+		EnablePredictiveRefill: true,
+		EnableLocalCache:       true,
+		LocalCacheSize:         optimal.CacheSize / 10,
+		LocalCacheTTL:          5 * time.Minute,
 	}
 }
 

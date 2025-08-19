@@ -926,3 +926,56 @@ func (p *MemoryLayeredPool) GetConfig(groupID uint) (*PoolConfig, error) {
 
 	return nil, NewPoolError(ErrorTypeConfiguration, "CONFIG_NOT_FOUND", "Configuration not found for group")
 }
+
+// GetKeyStatus 获取密钥状态
+func (p *MemoryLayeredPool) GetKeyStatus(keyID uint) (KeyStatus, error) {
+	// 获取密钥详情
+	details, err := p.getKeyDetails(keyID)
+	if err != nil {
+		return "", NewPoolErrorWithCause(ErrorTypeStorage, "KEY_DETAILS_FAILED", "Failed to get key details", err)
+	}
+
+	// 从详情中获取状态
+	if statusStr, exists := details["status"]; exists {
+		return KeyStatus(statusStr), nil
+	}
+
+	// 如果没有状态信息，检查密钥在哪个池中
+	groupIDStr, exists := details["group_id"]
+	if !exists {
+		return "", NewPoolError(ErrorTypeValidation, "MISSING_GROUP_ID", "Key details missing group_id")
+	}
+
+	groupID, err := strconv.ParseUint(groupIDStr, 10, 64)
+	if err != nil {
+		return "", NewPoolErrorWithCause(ErrorTypeInternal, "INVALID_GROUP_ID", "Invalid group ID format", err)
+	}
+
+	// 检查密钥在哪个池中
+	poolTypes := []PoolType{PoolTypeValidation, PoolTypeReady, PoolTypeActive, PoolTypeCooling}
+	for _, poolType := range poolTypes {
+		keys, err := p.ListKeys(uint(groupID), poolType)
+		if err != nil {
+			continue
+		}
+
+		for _, id := range keys {
+			if id == keyID {
+				// 根据池类型推断状态
+				switch poolType {
+				case PoolTypeValidation:
+					return KeyStatusActive, nil // 验证中的密钥视为活跃
+				case PoolTypeReady:
+					return KeyStatusActive, nil // 就绪的密钥视为活跃
+				case PoolTypeActive:
+					return KeyStatusActive, nil // 活跃的密钥
+				case PoolTypeCooling:
+					return KeyStatusRateLimited, nil // 冷却中的密钥视为受限
+				}
+			}
+		}
+	}
+
+	// 如果在所有池中都找不到，可能是无效密钥
+	return KeyStatusInvalid, nil
+}

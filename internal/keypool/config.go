@@ -88,7 +88,7 @@ func (e *EnhancedKeyProvider) SwitchToLegacyMode() error {
 // Close 关闭提供者
 func (e *EnhancedKeyProvider) Close() error {
 	if e.layeredPool != nil {
-		return e.layeredPool.Close()
+		return e.layeredPool.Stop()
 	}
 	return nil
 }
