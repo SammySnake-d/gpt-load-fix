@@ -1,30 +1,28 @@
 <script setup lang="ts">
-import type { Group, PoolStatsResponse, BatchRecoveryRequest } from "@/types/models";
-import { 
-  PlayOutline,
-  StopOutline,
-  RefreshOutline,
-  SettingsOutline,
-  FlashOutline,
-  TimeOutline
+import type { BatchRecoveryRequest, Group, PoolStatsResponse } from "@/types/models";
+import {
+    FlashOutline,
+    PlayOutline,
+    RefreshOutline,
+    SettingsOutline,
+    StopOutline
 } from "@vicons/ionicons5";
 import {
-  NCard,
-  NButton,
-  NSpace,
-  NIcon,
-  NInputNumber,
-  NSelect,
-  NForm,
-  NFormItem,
-  NSwitch,
-  NTooltip,
-  NTag,
-  NAlert,
-  useMessage,
-  useDialog,
+    NAlert,
+    NButton,
+    NCard,
+    NForm,
+    NFormItem,
+    NIcon,
+    NInputNumber,
+    NSelect,
+    NSpace,
+    NTag,
+    NTooltip,
+    useDialog,
+    useMessage
 } from "naive-ui";
-import { ref, computed } from "vue";
+import { computed, ref } from "vue";
 
 interface Props {
   group: Group | null;
@@ -170,18 +168,18 @@ function resetConfig() {
     <div class="recovery-control-content">
       <!-- 状态信息 -->
       <div class="status-section">
-        <n-alert 
-          v-if="!hasKeysToRecover" 
-          type="success" 
+        <n-alert
+          v-if="!hasKeysToRecover"
+          type="success"
           title="池状态良好"
           style="margin-bottom: 16px"
         >
           当前没有需要恢复的密钥
         </n-alert>
-        
-        <n-alert 
-          v-else 
-          type="warning" 
+
+        <n-alert
+          v-else
+          type="warning"
           :title="`发现 ${coolingKeysCount} 个密钥需要恢复`"
           style="margin-bottom: 16px"
         >
@@ -193,9 +191,9 @@ function resetConfig() {
       <div class="quick-actions">
         <div class="section-title">快速操作</div>
         <n-space :size="12" vertical>
-          <n-button 
-            type="primary" 
-            block 
+          <n-button
+            type="primary"
+            block
             :disabled="!hasKeysToRecover"
             @click="handleManualRecoveryAll"
           >
@@ -204,10 +202,10 @@ function resetConfig() {
             </template>
             立即恢复所有密钥
           </n-button>
-          
+
           <n-space :size="8">
-            <n-button 
-              type="success" 
+            <n-button
+              type="success"
               size="small"
               @click="handleStartRecoveryService"
             >
@@ -216,9 +214,9 @@ function resetConfig() {
               </template>
               启动自动恢复
             </n-button>
-            
-            <n-button 
-              type="error" 
+
+            <n-button
+              type="error"
               size="small"
               @click="handleStopRecoveryService"
             >
@@ -234,27 +232,27 @@ function resetConfig() {
       <!-- 批量恢复配置 -->
       <div class="batch-config">
         <div class="section-title">批量恢复配置</div>
-        
+
         <n-form :model="batchConfig" size="small">
           <n-form-item label="优先级">
-            <n-select 
-              v-model:value="batchConfig.priority" 
+            <n-select
+              v-model:value="batchConfig.priority"
               :options="priorityOptions"
               placeholder="选择优先级"
             />
           </n-form-item>
-          
+
           <n-form-item label="最大并发数">
-            <n-input-number 
+            <n-input-number
               v-model:value="batchConfig.max_concurrent"
               :min="1"
               :max="20"
               placeholder="并发恢复数量"
             />
           </n-form-item>
-          
+
           <n-form-item label="批次间延迟 (ms)">
-            <n-input-number 
+            <n-input-number
               v-model:value="batchConfig.delay_between_batches"
               :min="0"
               :max="10000"
@@ -262,10 +260,10 @@ function resetConfig() {
               placeholder="批次间延迟时间"
             />
           </n-form-item>
-          
+
           <n-form-item label="失败次数范围">
             <n-space :size="8" align="center">
-              <n-input-number 
+              <n-input-number
                 v-model:value="batchConfig.filter!.min_failure_count"
                 :min="0"
                 :max="100"
@@ -273,7 +271,7 @@ function resetConfig() {
                 style="width: 80px"
               />
               <span>-</span>
-              <n-input-number 
+              <n-input-number
                 v-model:value="batchConfig.filter!.max_failure_count"
                 :min="1"
                 :max="100"
@@ -283,10 +281,10 @@ function resetConfig() {
             </n-space>
           </n-form-item>
         </n-form>
-        
-        <n-button 
-          type="warning" 
-          block 
+
+        <n-button
+          type="warning"
+          block
           :disabled="!hasKeysToRecover"
           @click="handleBatchRecovery"
         >
@@ -300,26 +298,26 @@ function resetConfig() {
       <!-- 恢复统计 -->
       <div v-if="poolStats" class="recovery-stats">
         <div class="section-title">当前状态</div>
-        
+
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-label">验证池</div>
             <div class="stat-value">{{ poolStats.pool_stats.validation_pool }}</div>
             <n-tag type="success" size="small">可用</n-tag>
           </div>
-          
+
           <div class="stat-item">
             <div class="stat-label">就绪池</div>
             <div class="stat-value">{{ poolStats.pool_stats.ready_pool }}</div>
             <n-tag type="info" size="small">待用</n-tag>
           </div>
-          
+
           <div class="stat-item">
             <div class="stat-label">活跃池</div>
             <div class="stat-value">{{ poolStats.pool_stats.active_pool }}</div>
             <n-tag type="warning" size="small">使用中</n-tag>
           </div>
-          
+
           <div class="stat-item">
             <div class="stat-label">冷却池</div>
             <div class="stat-value">{{ poolStats.pool_stats.cooling_pool }}</div>
@@ -422,7 +420,7 @@ function resetConfig() {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .recovery-control-content {
     gap: 16px;
   }
