@@ -1,22 +1,20 @@
 <script setup lang="ts">
 import type { Group, PoolStatsResponse } from "@/types/models";
 import {
-  AlertCircleOutline,
-  BarChartOutline,
-  SettingsOutline,
-  SpeedometerOutline,
-  TrendingUpOutline,
+    AlertCircleOutline,
+    BarChartOutline,
+    SettingsOutline,
+    SpeedometerOutline,
+    TrendingUpOutline,
 } from "@vicons/ionicons5";
 import {
-  NButton,
-  NCard,
-  NGrid,
-  NGridItem,
-  NIcon,
-  NProgress,
-  NSpace,
-  NTooltip,
-  useMessage,
+    NButton,
+    NCard,
+    NGrid,
+    NGridItem,
+    NIcon,
+    NProgress,
+    NSpace
 } from "naive-ui";
 import { computed } from "vue";
 
@@ -162,7 +160,7 @@ function handlePoolRefill() {
                 :color="
                   performanceColors.errorRate === 'success'
                     ? '#10b981'
-                  performanceColors.errorRate === 'warning' ? '#f59e0b' : '#ef4444'"
+                    : performanceColors.errorRate === 'warning' ? '#f59e0b' : '#ef4444'"
                 :show-indicator="false"
                 :height="4"
                 style="margin-top: 8px"
@@ -185,7 +183,7 @@ function handlePoolRefill() {
                 :color="
                   performanceColors.cacheHitRate === 'success'
                     ? '#10b981'
-                  performanceColors.cacheHitRate === 'warning' ? '#f59e0b' : '#ef4444'"
+                    : performanceColors.cacheHitRate === 'warning' ? '#f59e0b' : '#ef4444'"
                 :show-indicator="false"
                 :height="4"
                 style="margin-top: 8px"

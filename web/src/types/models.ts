@@ -214,3 +214,43 @@ export interface RecoveryMetrics {
   avg_recovery_time: number;
   recent_recoveries: RecoveryRecord[];
 }
+
+// 池统计信息
+export interface PoolStats {
+  validation_pool: number;
+  ready_pool: number;
+  active_pool: number;
+  cooling_pool: number;
+  total_keys: number;
+}
+
+// 池健康状态
+export interface PoolHealth {
+  status: "healthy" | "warning" | "critical";
+  issues: string[];
+}
+
+// 性能指标
+export interface PerformanceMetrics {
+  throughput: number;
+  avg_latency: number;
+  error_rate: number;
+  cache_hit_rate: number;
+  total_requests: number;
+}
+
+// 池状态响应
+export interface PoolStatsResponse {
+  pool_stats: PoolStats;
+  pool_health: PoolHealth;
+  performance_metrics: PerformanceMetrics;
+  active_keys: number;
+  total_keys: number;
+  rate_limited_keys: number;
+  last_updated: string;
+  // 兼容旧版本的字段
+  priority_pool?: { active_count: number; total_count: number };
+  ready_pool?: { active_count: number; total_count: number };
+  active_pool?: { active_count: number; total_count: number };
+  cooling_pool?: { active_count: number; total_count: number };
+}

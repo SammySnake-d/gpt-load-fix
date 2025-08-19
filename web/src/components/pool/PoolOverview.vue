@@ -4,18 +4,16 @@ import {
     CheckmarkCircleOutline,
     FlashOutline,
     RefreshOutline,
-    SnowOutline,
     TimeOutline
 } from "@vicons/ionicons5";
 import {
-    NButton,
     NCard,
     NGrid,
     NGridItem,
     NIcon,
     NProgress,
     NStatistic,
-    NTag,
+    NTag
 } from "naive-ui";
 import { computed } from "vue";
 
@@ -29,7 +27,7 @@ const props = defineProps<Props>();
 // 计算池状态颜色
 const poolStatusColors = computed(() => {
   if (!props.poolStats) return {};
-  
+
   const stats = props.poolStats;
   return {
     priority: stats.priority_pool.active_count > 0 ? 'success' : 'warning',
@@ -42,12 +40,12 @@ const poolStatusColors = computed(() => {
 // 计算总体健康状态
 const overallHealth = computed(() => {
   if (!props.poolStats) return { status: 'unknown', color: 'default' };
-  
+
   const stats = props.poolStats;
-  const totalActive = stats.priority_pool.active_count + 
-                     stats.ready_pool.active_count + 
+  const totalActive = stats.priority_pool.active_count +
+                     stats.ready_pool.active_count +
                      stats.active_pool.active_count;
-  
+
   if (totalActive === 0) {
     return { status: 'critical', color: 'error' };
   } else if (totalActive < 5) {
@@ -62,8 +60,8 @@ const overallHealth = computed(() => {
   <n-card title="池概览" :bordered="false">
     <template #header-extra>
       <n-tag :type="overallHealth.color" size="small">
-        {{ overallHealth.status === 'healthy' ? '健康' : 
-           overallHealth.status === 'warning' ? '警告' : 
+        {{ overallHealth.status === 'healthy' ? '健康' :
+           overallHealth.status === 'warning' ? '警告' :
            overallHealth.status === 'critical' ? '严重' : '未知' }}
       </n-tag>
     </template>
@@ -166,7 +164,7 @@ const overallHealth = computed(() => {
               <n-progress
                 type="line"
                 :percentage="(poolStats.cooling_pool.active_count / Math.max(poolStats.cooling_pool.total_count, 1)) * 100"
-                :color="#6366f1"
+                color="#6366f1"
                 :show-indicator="false"
                 :height="4"
                 style="margin-top: 8px"
