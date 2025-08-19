@@ -1,23 +1,21 @@
 <script setup lang="ts">
 import type { Group, PoolStatsResponse } from "@/types/models";
-import { 
-  CheckmarkCircleOutline, 
-  TimeOutline, 
-  FlashOutline, 
-  SnowOutline,
-  RefreshOutline 
+import {
+    CheckmarkCircleOutline,
+    FlashOutline,
+    RefreshOutline,
+    SnowOutline,
+    TimeOutline
 } from "@vicons/ionicons5";
 import {
-  NCard,
-  NGrid,
-  NGridItem,
-  NIcon,
-  NProgress,
-  NStatistic,
-  NTag,
-  NTooltip,
-  NButton,
-  NSpace,
+    NButton,
+    NCard,
+    NGrid,
+    NGridItem,
+    NIcon,
+    NProgress,
+    NStatistic,
+    NTag,
 } from "naive-ui";
 import { computed } from "vue";
 
@@ -195,16 +193,16 @@ function formatTime(timeStr?: string) {
             <n-statistic label="总密钥数" :value="poolStats.pool_stats.total_keys" />
           </n-grid-item>
           <n-grid-item>
-            <n-statistic 
-              label="吞吐量" 
-              :value="poolStats.performance_metrics.throughput" 
+            <n-statistic
+              label="吞吐量"
+              :value="poolStats.performance_metrics.throughput"
               suffix="req/s"
             />
           </n-grid-item>
           <n-grid-item>
-            <n-statistic 
-              label="平均延迟" 
-              :value="poolStats.performance_metrics.avg_latency" 
+            <n-statistic
+              label="平均延迟"
+              :value="poolStats.performance_metrics.avg_latency"
               suffix="ms"
             />
           </n-grid-item>
@@ -216,11 +214,11 @@ function formatTime(timeStr?: string) {
         <div class="health-header">
           <span class="health-title">池健康状态</span>
           <n-tag :type="healthStatusColor" round>
-            {{ poolStats.pool_health.status === 'healthy' ? '健康' : 
+            {{ poolStats.pool_health.status === 'healthy' ? '健康' :
                poolStats.pool_health.status === 'warning' ? '警告' : '严重' }}
           </n-tag>
         </div>
-        
+
         <div v-if="poolStats.pool_health.issues.length > 0" class="health-issues">
           <div class="issues-title">发现的问题：</div>
           <ul class="issues-list">
@@ -382,13 +380,13 @@ function formatTime(timeStr?: string) {
   .pool-stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .stat-content {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
   }
-  
+
   .overall-stats :deep(.n-grid) {
     grid-template-columns: 1fr;
     gap: 16px;

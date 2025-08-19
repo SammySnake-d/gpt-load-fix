@@ -1,26 +1,23 @@
 <script setup lang="ts">
 import type { Group, RecoveryMetrics } from "@/types/models";
-import { 
-  TrendingUpOutline,
-  TimeOutline,
-  CheckmarkCircleOutline,
-  CloseCircleOutline,
-  BarChartOutline,
-  RefreshOutline
+import {
+    BarChartOutline,
+    CheckmarkCircleOutline,
+    CloseCircleOutline,
+    RefreshOutline,
+    TimeOutline
 } from "@vicons/ionicons5";
 import {
-  NCard,
-  NGrid,
-  NGridItem,
-  NIcon,
-  NProgress,
-  NStatistic,
-  NTag,
-  NButton,
-  NSpace,
-  NTooltip,
-  NTable,
-  NEmpty,
+    NButton,
+    NCard,
+    NEmpty,
+    NGrid,
+    NGridItem,
+    NIcon,
+    NProgress,
+    NStatistic,
+    NTable,
+    NTag
 } from "naive-ui";
 import { computed } from "vue";
 
@@ -39,7 +36,7 @@ const emit = defineEmits<Emits>();
 // 计算成功率颜色
 const successRateColor = computed(() => {
   if (!props.recoveryMetrics) return "default";
-  
+
   const rate = props.recoveryMetrics.overall_success_rate;
   if (rate >= 0.9) return "success";
   if (rate >= 0.7) return "warning";
@@ -174,7 +171,7 @@ const hourlyColumns = [
               <n-progress
                 type="circle"
                 :percentage="recoveryMetrics.overall_success_rate * 100"
-                :color="successRateColor === 'success' ? '#10b981' : 
+                :color="successRateColor === 'success' ? '#10b981' :
                        successRateColor === 'warning' ? '#f59e0b' : '#ef4444'"
                 :stroke-width="8"
                 style="margin-top: 12px"
@@ -195,7 +192,7 @@ const hourlyColumns = [
               <n-progress
                 type="line"
                 :percentage="recoveryMetrics.recent_success_rate * 100"
-                :color="recoveryMetrics.recent_success_rate >= 0.8 ? '#10b981' : 
+                :color="recoveryMetrics.recent_success_rate >= 0.8 ? '#10b981' :
                        recoveryMetrics.recent_success_rate >= 0.6 ? '#f59e0b' : '#ef4444'"
                 :show-indicator="false"
                 :height="6"
@@ -213,15 +210,15 @@ const hourlyColumns = [
         </div>
         <n-grid :cols="2" :x-gap="16">
           <n-grid-item>
-            <n-statistic 
-              label="每小时恢复次数" 
-              :value="recoveryMetrics.recoveries_per_hour.toFixed(1)" 
+            <n-statistic
+              label="每小时恢复次数"
+              :value="recoveryMetrics.recoveries_per_hour.toFixed(1)"
             />
           </n-grid-item>
           <n-grid-item>
-            <n-statistic 
-              label="最后恢复时间" 
-              :value="formatTime(recoveryMetrics.last_recovery_at)" 
+            <n-statistic
+              label="最后恢复时间"
+              :value="formatTime(recoveryMetrics.last_recovery_at)"
             />
           </n-grid-item>
         </n-grid>
@@ -233,8 +230,8 @@ const hourlyColumns = [
           <h4 class="stats-title">错误统计</h4>
         </div>
         <div class="error-list">
-          <div 
-            v-for="(count, errorType) in recoveryMetrics.error_stats" 
+          <div
+            v-for="(count, errorType) in recoveryMetrics.error_stats"
             :key="errorType"
             class="error-item"
           >
@@ -250,9 +247,9 @@ const hourlyColumns = [
           <h4 class="stats-title">小时统计</h4>
           <span class="stats-subtitle">最近24小时恢复情况</span>
         </div>
-        <n-table 
-          :columns="hourlyColumns" 
-          :data="recoveryMetrics.hourly_stats.slice(-12)" 
+        <n-table
+          :columns="hourlyColumns"
+          :data="recoveryMetrics.hourly_stats.slice(-12)"
           size="small"
           :bordered="false"
           :single-line="false"
@@ -413,11 +410,11 @@ const hourlyColumns = [
   .core-metrics :deep(.n-grid) {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .success-rate-section :deep(.n-grid) {
     grid-template-columns: 1fr;
   }
-  
+
   .frequency-stats :deep(.n-grid) {
     grid-template-columns: 1fr;
   }
@@ -427,7 +424,7 @@ const hourlyColumns = [
   .core-metrics :deep(.n-grid) {
     grid-template-columns: 1fr;
   }
-  
+
   .rate-header {
     flex-direction: column;
     gap: 4px;

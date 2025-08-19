@@ -1,25 +1,23 @@
 <script setup lang="ts">
 import type { Group, PoolStatsResponse } from "@/types/models";
-import { 
-  BarChartOutline,
-  TrendingUpOutline,
-  SpeedometerOutline,
-  AlertCircleOutline,
-  RefreshOutline,
-  SettingsOutline
+import {
+    AlertCircleOutline,
+    BarChartOutline,
+    RefreshOutline,
+    SettingsOutline,
+    SpeedometerOutline,
+    TrendingUpOutline
 } from "@vicons/ionicons5";
 import {
-  NCard,
-  NGrid,
-  NGridItem,
-  NIcon,
-  NProgress,
-  NStatistic,
-  NTag,
-  NButton,
-  NSpace,
-  NTooltip,
-  useMessage,
+    NButton,
+    NCard,
+    NGrid,
+    NGridItem,
+    NIcon,
+    NProgress,
+    NSpace,
+    NTooltip,
+    useMessage,
 } from "naive-ui";
 import { computed } from "vue";
 
@@ -46,7 +44,7 @@ const performanceColors = computed(() => {
   }
 
   const metrics = props.poolStats.performance_metrics;
-  
+
   return {
     errorRate: metrics.error_rate < 0.05 ? "success" : metrics.error_rate < 0.1 ? "warning" : "error",
     cacheHitRate: metrics.cache_hit_rate > 0.8 ? "success" : metrics.cache_hit_rate > 0.6 ? "warning" : "error",
@@ -93,7 +91,7 @@ function handleOptimizeConfig() {
           </template>
           优化配置
         </n-tooltip>
-        
+
         <n-tooltip trigger="hover">
           <template #trigger>
             <n-button size="small" type="primary" @click="handleRefillPools">
@@ -171,7 +169,7 @@ function handleOptimizeConfig() {
               <n-progress
                 type="line"
                 :percentage="poolStats.performance_metrics.error_rate * 100"
-                :color="performanceColors.errorRate === 'success' ? '#10b981' : 
+                :color="performanceColors.errorRate === 'success' ? '#10b981' :
                        performanceColors.errorRate === 'warning' ? '#f59e0b' : '#ef4444'"
                 :show-indicator="false"
                 :height="4"
@@ -195,7 +193,7 @@ function handleOptimizeConfig() {
               <n-progress
                 type="line"
                 :percentage="poolStats.performance_metrics.cache_hit_rate * 100"
-                :color="performanceColors.cacheHitRate === 'success' ? '#10b981' : 
+                :color="performanceColors.cacheHitRate === 'success' ? '#10b981' :
                        performanceColors.cacheHitRate === 'warning' ? '#f59e0b' : '#ef4444'"
                 :show-indicator="false"
                 :height="4"
@@ -214,14 +212,14 @@ function handleOptimizeConfig() {
             总计: {{ poolStats.pool_stats.total_keys }} 个密钥
           </div>
         </div>
-        
+
         <div class="distribution-chart">
           <div class="chart-bar">
             <!-- 验证池 -->
-            <div 
+            <div
               class="bar-segment validation-segment"
-              :style="{ 
-                width: `${(poolStats.pool_stats.validation_pool / poolStats.pool_stats.total_keys) * 100}%` 
+              :style="{
+                width: `${(poolStats.pool_stats.validation_pool / poolStats.pool_stats.total_keys) * 100}%`
               }"
             >
               <n-tooltip trigger="hover">
@@ -231,12 +229,12 @@ function handleOptimizeConfig() {
                 验证池: {{ poolStats.pool_stats.validation_pool }} 个
               </n-tooltip>
             </div>
-            
+
             <!-- 就绪池 -->
-            <div 
+            <div
               class="bar-segment ready-segment"
-              :style="{ 
-                width: `${(poolStats.pool_stats.ready_pool / poolStats.pool_stats.total_keys) * 100}%` 
+              :style="{
+                width: `${(poolStats.pool_stats.ready_pool / poolStats.pool_stats.total_keys) * 100}%`
               }"
             >
               <n-tooltip trigger="hover">
@@ -246,12 +244,12 @@ function handleOptimizeConfig() {
                 就绪池: {{ poolStats.pool_stats.ready_pool }} 个
               </n-tooltip>
             </div>
-            
+
             <!-- 活跃池 -->
-            <div 
+            <div
               class="bar-segment active-segment"
-              :style="{ 
-                width: `${(poolStats.pool_stats.active_pool / poolStats.pool_stats.total_keys) * 100}%` 
+              :style="{
+                width: `${(poolStats.pool_stats.active_pool / poolStats.pool_stats.total_keys) * 100}%`
               }"
             >
               <n-tooltip trigger="hover">
@@ -261,12 +259,12 @@ function handleOptimizeConfig() {
                 活跃池: {{ poolStats.pool_stats.active_pool }} 个
               </n-tooltip>
             </div>
-            
+
             <!-- 冷却池 -->
-            <div 
+            <div
               class="bar-segment cooling-segment"
-              :style="{ 
-                width: `${(poolStats.pool_stats.cooling_pool / poolStats.pool_stats.total_keys) * 100}%` 
+              :style="{
+                width: `${(poolStats.pool_stats.cooling_pool / poolStats.pool_stats.total_keys) * 100}%`
               }"
             >
               <n-tooltip trigger="hover">
@@ -277,7 +275,7 @@ function handleOptimizeConfig() {
               </n-tooltip>
             </div>
           </div>
-          
+
           <!-- 图例 -->
           <div class="chart-legend">
             <div class="legend-item">
@@ -492,13 +490,13 @@ function handleOptimizeConfig() {
   .performance-metrics :deep(.n-grid) {
     grid-template-columns: 1fr;
   }
-  
+
   .distribution-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
   }
-  
+
   .chart-legend {
     justify-content: flex-start;
     gap: 12px;

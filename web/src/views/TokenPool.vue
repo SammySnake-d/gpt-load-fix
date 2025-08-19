@@ -18,20 +18,21 @@ import {
     NSpin,
     useMessage
 } from "naive-ui";
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 
 const message = useMessage();
 const loading = ref(false);
 const groups = ref<Group[]>([]);
 const selectedGroup = ref<Group | null>(null);
+const selectedGroupId = ref<number | null>(null);
 const poolStats = ref<PoolStatsResponse | null>(null);
 const recoveryMetrics = ref<RecoveryMetrics | null>(null);
 const autoRefresh = ref(true);
-const refreshInterval = ref<NodeJS.Timeout | null>(null);
+const refreshInterval = ref<number | null>(null);
 
 // 分组选项
 const groupOptions = computed(() => [
-  { label: "选择分组", value: null, disabled: true },
+  { label: "选择分组", value: null, disabled: true, type: 'group' as const },
   ...groups.value.map(group => ({
     label: `${group.name} (${group.id})`,
     value: group.id,
@@ -64,12 +65,15 @@ async function loadGroups() {
   }
 }
 
-// 监听分组变化
-watch(selectedGroup, async (newGroup) => {
-  if (newGroup) {
-    await loadPoolData();
+// 分组变化处理
+function onGroupChange(groupId: number | null) {
+  if (groupId) {
+    selectedGroup.value = groups.value.find(g => g.id === groupId) || null;
+    loadPoolData();
+  } else {
+    selectedGroup.value = null;
   }
-});
+}
 
 // 加载池数据
 async function loadPoolData() {
@@ -80,8 +84,8 @@ async function loadPoolData() {
 
     // 并行加载池统计和恢复指标
     const [statsRes, metricsRes] = await Promise.all([
-      poolApi.getPoolStats(selectedGroup.value.id),
-      poolApi.getRecoveryMetrics(selectedGroup.value.id),
+      poolApi.getPoolStats(selectedGroup.value?.id || 0),
+      poolApi.getRecoveryMetrics(selectedGroup.value?.id || 0),
     ]);
 
     poolStats.value = statsRes;
@@ -133,15 +137,15 @@ async function handleRecoveryAction(action: string, data?: any) {
   try {
     switch (action) {
       case 'manual_recovery':
-        await poolApi.triggerManualRecovery(selectedGroup.value.id, data.keyIds);
+        await poolApi.triggerManualRecovery(selectedGroup.value?.id || 0, data.keyIds);
         message.success(`已触发 ${data.keyIds.length} 个密钥的手动恢复`);
         break;
       case 'batch_recovery':
-        await poolApi.triggerBatchRecovery(selectedGroup.value.id, data);
+        await poolApi.triggerBatchRecovery(selectedGroup.value?.id || 0, data);
         message.success("已触发批量恢复");
         break;
       case 'pool_refill':
-        await poolApi.refillPools(selectedGroup.value.id);
+        await poolApi.refillPools(selectedGroup.value?.id || 0);
         message.success("池重填完成");
         break;
     }
@@ -149,7 +153,7 @@ async function handleRecoveryAction(action: string, data?: any) {
     // 刷新数据
     await loadPoolData();
   } catch (error) {
-    message.error(`操作失败: ${error.message}`);
+    message.error(`操作失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 </script>
@@ -167,12 +171,12 @@ async function handleRecoveryAction(action: string, data?: any) {
         <n-space :size="12">
           <!-- 分组选择 -->
           <n-select
-            v-model:value="selectedGroup"
+            v-model:value="selectedGroupId"
             :options="groupOptions"
             placeholder="选择分组"
             style="width: 200px"
             :loading="loading"
-            @update:value="loadPoolData"
+            @update:value="onGroupChange"
           />
 
           <!-- 自动刷新开关 -->
