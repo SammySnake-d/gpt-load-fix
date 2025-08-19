@@ -266,7 +266,7 @@ func (pm *PoolManager) GetPoolStats() map[uint]*PoolStats {
 	stats := make(map[uint]*PoolStats)
 
 	for groupID, pool := range pm.pools {
-		if poolStats, err := pool.GetStats(groupID); err == nil {
+		if poolStats, err := pool.GetPoolStats(groupID); err == nil {
 			stats[groupID] = poolStats
 		}
 	}
