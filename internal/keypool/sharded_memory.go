@@ -599,6 +599,30 @@ func (s *ShardedMemoryStore) LRange(key string, start, stop int) ([]string, erro
 	return result, nil
 }
 
+// LLen 获取列表长度
+func (s *ShardedMemoryStore) LLen(key string) (int64, error) {
+	shard := s.getShard(key)
+
+	shard.mu.RLock()
+	defer shard.mu.RUnlock()
+
+	rawList, exists := shard.data[key]
+	if !exists {
+		return 0, nil
+	}
+
+	list, ok := rawList.([]string)
+	if !ok {
+		return 0, fmt.Errorf("type mismatch: key '%s' holds a different data type", key)
+	}
+
+	if s.config.EnableMetrics {
+		shard.metrics.readCount++
+	}
+
+	return int64(len(list)), nil
+}
+
 // --- SET operations ---
 
 // SAdd 向集合添加成员

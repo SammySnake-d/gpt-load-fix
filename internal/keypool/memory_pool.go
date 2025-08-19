@@ -724,8 +724,6 @@ func (p *MemoryLayeredPool) RefillPools(groupID uint) error {
 
 // RecoverCooledKeys 恢复已过期的冷却密钥
 func (p *MemoryLayeredPool) RecoverCooledKeys(groupID uint) (int, error) {
-	now := time.Now()
-
 	// 获取已过期的冷却密钥
 	expiredKeys, err := p.getExpiredFromCoolingPool(groupID)
 	if err != nil {
@@ -1177,9 +1175,7 @@ func (p *MemoryLayeredPool) cleanupExpiredCache() {
 	}
 
 	// 调用本地缓存的清理方法
-	if cache, ok := p.localCache.(*localKeyCache); ok {
-		cache.cleanupExpired()
-	}
+	p.localCache.cleanupExpired()
 }
 
 // getCachedKey 从本地缓存获取密钥
@@ -1201,9 +1197,7 @@ func (p *MemoryLayeredPool) setCachedKey(keyID uint, key *models.APIKey) {
 	}
 
 	// 使用localKeyCache的Set方法
-	if cache, ok := p.localCache.(*localKeyCache); ok {
-		cache.Set(keyID, key)
-	}
+	p.localCache.Set(keyID, key)
 }
 
 // removeCachedKey 从本地缓存移除密钥
@@ -1364,7 +1358,11 @@ func (p *MemoryLayeredPool) addToCoolingPool(groupID uint, keyID uint, resetAt t
 	score := float64(resetAt.Unix())
 
 	// 使用ZADD操作添加到有序集合
-	return p.shardedStore.ZAdd(coolingKey, score, keyID)
+	member := store.ZMember{
+		Score:  score,
+		Member: keyID,
+	}
+	return p.shardedStore.ZAdd(coolingKey, member)
 }
 
 // getExpiredFromCoolingPool 获取已过期的冷却密钥
@@ -1781,20 +1779,20 @@ func (p *MemoryLayeredPool) GetKeyStatus(keyID uint) (KeyStatus, error) {
 				// 根据池类型推断状态
 				switch poolType {
 				case PoolTypeValidation:
-					return KeyStatusActive, nil // 验证中的密钥视为活跃
+					return models.KeyStatusActive, nil // 验证中的密钥视为活跃
 				case PoolTypeReady:
-					return KeyStatusActive, nil // 就绪的密钥视为活跃
+					return models.KeyStatusActive, nil // 就绪的密钥视为活跃
 				case PoolTypeActive:
-					return KeyStatusActive, nil // 活跃的密钥
+					return models.KeyStatusActive, nil // 活跃的密钥
 				case PoolTypeCooling:
-					return KeyStatusRateLimited, nil // 冷却中的密钥视为受限
+					return models.KeyStatusRateLimited, nil // 冷却中的密钥视为受限
 				}
 			}
 		}
 	}
 
 	// 如果在所有池中都找不到，可能是无效密钥
-	return KeyStatusInvalid, nil
+	return models.KeyStatusInvalid, nil
 }
 
 // ListKeys 列出指定池中的密钥
