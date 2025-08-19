@@ -44,7 +44,7 @@ function formatPercentage(value: number): string {
 <template>
   <n-card title="恢复监控" :bordered="false">
     <template #header-extra>
-      <n-button size="small" :disabled="!group">
+      <n-button size="small" :disabled="!props.group">
         <template #icon>
           <n-icon :component="RefreshOutline" />
         </template>
@@ -52,7 +52,7 @@ function formatPercentage(value: number): string {
       </n-button>
     </template>
 
-    <div v-if="!recoveryMetrics" class="loading-state">
+    <div v-if="!props.recoveryMetrics" class="loading-state">
       <n-empty description="暂无恢复数据" />
     </div>
 
@@ -64,32 +64,32 @@ function formatPercentage(value: number): string {
           <n-grid-item>
             <n-statistic
               label="总恢复次数"
-              :value="recoveryMetrics.total_recoveries"
+              :value="props.recoveryMetrics.total_recoveries"
             />
           </n-grid-item>
           <n-grid-item>
             <n-statistic
               label="成功恢复"
-              :value="recoveryMetrics.successful_recoveries"
+              :value="props.recoveryMetrics.successful_recoveries"
             />
           </n-grid-item>
           <n-grid-item>
             <n-statistic
               label="成功率"
-              :value="formatPercentage(recoveryMetrics.success_rate)"
+              :value="formatPercentage(props.recoveryMetrics.success_rate)"
             />
           </n-grid-item>
           <n-grid-item>
             <n-statistic
               label="平均恢复时间"
-              :value="formatTime(recoveryMetrics.avg_recovery_time)"
+              :value="formatTime(props.recoveryMetrics.avg_recovery_time)"
             />
           </n-grid-item>
         </n-grid>
       </div>
 
       <!-- 恢复趋势 -->
-      <div class="trends-section" v-if="recoveryMetrics.recent_recoveries">
+      <div class="trends-section" v-if="props.recoveryMetrics.recent_recoveries">
         <h4 class="section-title">最近恢复记录</h4>
         <n-table :bordered="false" :single-line="false">
           <thead>
@@ -101,7 +101,7 @@ function formatPercentage(value: number): string {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(recovery, index) in recoveryMetrics.recent_recoveries" :key="index">
+            <tr v-for="(recovery, index) in props.recoveryMetrics.recent_recoveries" :key="index">
               <td>{{ new Date(recovery.timestamp).toLocaleString() }}</td>
               <td>{{ recovery.key_count }}</td>
               <td>{{ formatTime(recovery.recovery_time) }}</td>
