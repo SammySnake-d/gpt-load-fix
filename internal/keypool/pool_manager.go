@@ -390,7 +390,7 @@ func (pm *PoolManager) ApplyOptimalConfig(groupID uint, config *OptimizerOptimal
 }
 
 // ApplyOptimalConfigToAll 应用最优配置到所有分组
-func (pm *PoolManager) ApplyOptimalConfigToAll(config *OptimalConfig) error {
+func (pm *PoolManager) ApplyOptimalConfigToAll(config *OptimizerOptimalConfig) error {
 	if pm.configApplier != nil {
 		return pm.configApplier.ApplyToAllGroups(config)
 	}

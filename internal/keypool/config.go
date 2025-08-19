@@ -27,6 +27,12 @@ type EnhancedKeyProvider struct {
 
 	// 配置
 	config          *EnhancedProviderConfig
+
+	// 分层池
+	layeredPool     LayeredPool
+
+	// 状态
+	usingLayeredPool bool
 }
 
 // EnhancedProviderConfig 增强提供者配置
@@ -53,7 +59,35 @@ func NewEnhancedKeyProvider(
 		store:           store,
 		settingsManager: settingsManager,
 		config:          config,
+		usingLayeredPool: config.UseLayeredPool,
 	}, nil
+}
+
+// IsUsingLayeredPool 检查是否使用分层池
+func (e *EnhancedKeyProvider) IsUsingLayeredPool() bool {
+	return e.usingLayeredPool
+}
+
+// SwitchToLayeredPool 切换到分层池模式
+func (e *EnhancedKeyProvider) SwitchToLayeredPool() error {
+	e.usingLayeredPool = true
+	e.config.UseLayeredPool = true
+	return nil
+}
+
+// SwitchToLegacyMode 切换到传统模式
+func (e *EnhancedKeyProvider) SwitchToLegacyMode() error {
+	e.usingLayeredPool = false
+	e.config.UseLayeredPool = false
+	return nil
+}
+
+// Close 关闭提供者
+func (e *EnhancedKeyProvider) Close() error {
+	if e.layeredPool != nil {
+		return e.layeredPool.Close()
+	}
+	return nil
 }
 
 // GlobalConfig 全局密钥池配置

@@ -433,7 +433,7 @@ func (t *PerformanceTuner) calculatePercentile(latencies []time.Duration, percen
 }
 
 // GetOptimalConfig 获取最优配置
-func (t *PerformanceTuner) GetOptimalConfig() *OptimalConfig {
+func (t *PerformanceTuner) GetOptimalConfig() *TunerOptimalConfig {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.optimalConfig
