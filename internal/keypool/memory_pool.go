@@ -540,6 +540,65 @@ func (p *MemoryLayeredPool) RemoveKeys(groupID uint, keyIDs []uint) error {
 	return nil
 }
 
+// removeKeysFromPool 从指定池移除密钥的内部方法
+func (p *MemoryLayeredPool) removeKeysFromPool(groupID uint, keyIDs []uint, poolType PoolType) error {
+	if len(keyIDs) == 0 {
+		return nil
+	}
+
+	switch poolType {
+	case PoolTypeValidation:
+		return p.removeFromValidationPool(groupID, keyIDs)
+	case PoolTypeReady:
+		return p.removeFromReadyPool(groupID, keyIDs)
+	case PoolTypeActive:
+		return p.removeFromActivePool(groupID, keyIDs)
+	case PoolTypeCooling:
+		return p.removeFromCoolingPool(groupID, keyIDs)
+	default:
+		return NewPoolError(ErrorTypeValidation, "UNKNOWN_POOL_TYPE", "Unknown pool type")
+	}
+}
+
+// removeFromValidationPool 从验证池移除密钥
+func (p *MemoryLayeredPool) removeFromValidationPool(groupID uint, keyIDs []uint) error {
+	validationKey := p.getRedisKey(groupID, PoolTypeValidation)
+
+	// 转换为interface{}切片
+	members := make([]interface{}, len(keyIDs))
+	for i, keyID := range keyIDs {
+		members[i] = keyID
+	}
+
+	return p.shardedStore.SRem(validationKey, members...)
+}
+
+// removeFromReadyPool 从就绪池移除密钥
+func (p *MemoryLayeredPool) removeFromReadyPool(groupID uint, keyIDs []uint) error {
+	readyKey := p.getRedisKey(groupID, PoolTypeReady)
+
+	for _, keyID := range keyIDs {
+		if err := p.shardedStore.LRem(readyKey, 0, keyID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// removeFromActivePool 从活跃池移除密钥
+func (p *MemoryLayeredPool) removeFromActivePool(groupID uint, keyIDs []uint) error {
+	activeKey := p.getRedisKey(groupID, PoolTypeActive)
+
+	for _, keyID := range keyIDs {
+		if err := p.shardedStore.LRem(activeKey, 0, keyID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // MoveKey 在不同池之间移动密钥
 func (p *MemoryLayeredPool) MoveKey(keyID uint, fromPool, toPool PoolType) error {
 	// 获取密钥详情以确定分组
@@ -565,6 +624,57 @@ func (p *MemoryLayeredPool) MoveKey(keyID uint, fromPool, toPool PoolType) error
 
 	// 执行移动操作
 	return p.executeAtomicMove(keyID, uint(groupID), fromPool, toPool)
+}
+
+// executeAtomicMove 执行原子性的密钥移动
+func (p *MemoryLayeredPool) executeAtomicMove(keyID, groupID uint, fromPool, toPool PoolType) error {
+	// 首先从源池移除
+	if err := p.removeKeysFromPool(groupID, []uint{keyID}, fromPool); err != nil {
+		return NewPoolErrorWithCause(ErrorTypeStorage, "REMOVE_FROM_SOURCE_FAILED",
+			fmt.Sprintf("Failed to remove key from %s pool", fromPool), err)
+	}
+
+	// 然后添加到目标池
+	if err := p.addKeysToPool(groupID, []uint{keyID}, toPool); err != nil {
+		// 移动失败，尝试回滚到源池
+		if rollbackErr := p.addKeysToPool(groupID, []uint{keyID}, fromPool); rollbackErr != nil {
+			logrus.WithFields(logrus.Fields{
+				"keyID":       keyID,
+				"fromPool":    fromPool,
+				"toPool":      toPool,
+				"rollbackErr": rollbackErr,
+			}).Error("Failed to rollback key move operation")
+		}
+
+		return NewPoolErrorWithCause(ErrorTypeStorage, "ADD_TO_TARGET_FAILED",
+			fmt.Sprintf("Failed to add key to %s pool", toPool), err)
+	}
+
+	// 发送事件
+	if p.eventHandler != nil {
+		event := &KeyPoolEvent{
+			Type:      EventKeyMoved,
+			GroupID:   groupID,
+			KeyID:     keyID,
+			PoolType:  toPool,
+			Message:   fmt.Sprintf("Key moved from %s to %s", fromPool, toPool),
+			Timestamp: time.Now(),
+			Metadata: map[string]interface{}{
+				"fromPool": fromPool,
+				"toPool":   toPool,
+			},
+		}
+		p.eventHandler.HandleEvent(event)
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"keyID":    keyID,
+		"groupID":  groupID,
+		"fromPool": fromPool,
+		"toPool":   toPool,
+	}).Info("Key moved between pools")
+
+	return nil
 }
 
 // RefillPools 智能池补充机制
@@ -1067,9 +1177,494 @@ func (p *MemoryLayeredPool) cleanupExpiredCache() {
 	}
 
 	// 调用本地缓存的清理方法
-	if cache, ok := p.localCache.(*LocalKeyCache); ok {
+	if cache, ok := p.localCache.(*localKeyCache); ok {
 		cache.cleanupExpired()
 	}
+}
+
+// getCachedKey 从本地缓存获取密钥
+func (p *MemoryLayeredPool) getCachedKey(groupID uint) *models.APIKey {
+	if p.localCache == nil {
+		return nil
+	}
+
+	// 这里简化实现，实际可能需要更复杂的缓存策略
+	// 由于我们没有按groupID索引，这里返回nil
+	// 实际实现中可能需要维护一个groupID到keyID的映射
+	return nil
+}
+
+// setCachedKey 设置本地缓存中的密钥
+func (p *MemoryLayeredPool) setCachedKey(keyID uint, key *models.APIKey) {
+	if p.localCache == nil {
+		return
+	}
+
+	// 使用localKeyCache的Set方法
+	if cache, ok := p.localCache.(*localKeyCache); ok {
+		cache.Set(keyID, key)
+	}
+}
+
+// removeCachedKey 从本地缓存移除密钥
+func (p *MemoryLayeredPool) removeCachedKey(keyID uint) {
+	if p.localCache == nil {
+		return
+	}
+
+	p.localCache.Remove(keyID)
+}
+
+// getKeyDetails 获取密钥详情
+func (p *MemoryLayeredPool) getKeyDetails(keyID uint) (map[string]string, error) {
+	detailsKey := p.getKeyDetailsKey(keyID)
+	return p.shardedStore.HGetAll(detailsKey)
+}
+
+// setKeyDetails 设置密钥详情
+func (p *MemoryLayeredPool) setKeyDetails(keyID uint, details map[string]interface{}) error {
+	detailsKey := p.getKeyDetailsKey(keyID)
+	return p.shardedStore.HSet(detailsKey, details)
+}
+
+// buildAPIKeyFromDetails 从详情构建APIKey对象
+func (p *MemoryLayeredPool) buildAPIKeyFromDetails(keyID, groupID uint, details map[string]string) (*models.APIKey, error) {
+	keyValue, exists := details["key_value"]
+	if !exists {
+		return nil, NewPoolError(ErrorTypeValidation, "MISSING_KEY_VALUE", "Key details missing key_value")
+	}
+
+	status := details["status"]
+	if status == "" {
+		status = models.KeyStatusActive
+	}
+
+	// 解析数值字段
+	requestCount, _ := strconv.ParseInt(details["request_count"], 10, 64)
+	failureCount, _ := strconv.ParseInt(details["failure_count"], 10, 64)
+	rateLimitCount, _ := strconv.ParseInt(details["rate_limit_count"], 10, 64)
+	createdAt, _ := strconv.ParseInt(details["created_at"], 10, 64)
+
+	apiKey := &models.APIKey{
+		ID:             keyID,
+		KeyValue:       keyValue,
+		Status:         status,
+		RequestCount:   requestCount,
+		FailureCount:   failureCount,
+		RateLimitCount: rateLimitCount,
+		GroupID:        groupID,
+		CreatedAt:      time.Unix(createdAt, 0),
+	}
+
+	// 解析可选的时间字段
+	if lastUsedStr := details["last_used_at"]; lastUsedStr != "" {
+		if lastUsed, err := strconv.ParseInt(lastUsedStr, 10, 64); err == nil {
+			lastUsedTime := time.Unix(lastUsed, 0)
+			apiKey.LastUsedAt = &lastUsedTime
+		}
+	}
+
+	if last429Str := details["last_429_at"]; last429Str != "" {
+		if last429, err := strconv.ParseInt(last429Str, 10, 64); err == nil {
+			last429Time := time.Unix(last429, 0)
+			apiKey.Last429At = &last429Time
+		}
+	}
+
+	if resetAtStr := details["rate_limit_reset_at"]; resetAtStr != "" {
+		if resetAt, err := strconv.ParseInt(resetAtStr, 10, 64); err == nil {
+			resetAtTime := time.Unix(resetAt, 0)
+			apiKey.RateLimitResetAt = &resetAtTime
+		}
+	}
+
+	return apiKey, nil
+}
+
+// updateKeyStats 更新密钥统计
+func (p *MemoryLayeredPool) updateKeyStats(keyID uint, success bool) {
+	details, err := p.getKeyDetails(keyID)
+	if err != nil {
+		return
+	}
+
+	requestCount, _ := strconv.ParseInt(details["request_count"], 10, 64)
+	updates := map[string]interface{}{
+		"request_count": requestCount + 1,
+		"last_used_at":  time.Now().Unix(),
+	}
+
+	if success {
+		// 成功时重置失败计数
+		updates["failure_count"] = 0
+	}
+
+	p.setKeyDetails(keyID, updates)
+}
+
+// handleKeyFailure 处理密钥失败
+func (p *MemoryLayeredPool) handleKeyFailure(keyID, groupID uint) error {
+	// 获取当前失败次数
+	details, err := p.getKeyDetails(keyID)
+	if err != nil {
+		return err
+	}
+
+	failureCount, _ := strconv.ParseInt(details["failure_count"], 10, 64)
+	newFailureCount := failureCount + 1
+
+	// 获取分组配置
+	var group models.Group
+	if err := p.db.First(&group, groupID).Error; err != nil {
+		return NewPoolErrorWithCause(ErrorTypeStorage, "GROUP_NOT_FOUND", "Failed to find group", err)
+	}
+
+	blacklistThreshold := group.EffectiveConfig.BlacklistThreshold
+	updates := map[string]interface{}{
+		"failure_count": newFailureCount,
+	}
+
+	// 检查是否需要拉黑
+	if blacklistThreshold > 0 && newFailureCount >= int64(blacklistThreshold) {
+		updates["status"] = models.KeyStatusInvalid
+
+		// 从活跃池移除
+		activeKey := p.getRedisKey(groupID, PoolTypeActive)
+		if err := p.shardedStore.LRem(activeKey, 0, keyID); err != nil {
+			logrus.WithFields(logrus.Fields{"keyID": keyID, "error": err}).Warn("Failed to remove invalid key from active pool")
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"keyID":              keyID,
+			"groupID":            groupID,
+			"failureCount":       newFailureCount,
+			"blacklistThreshold": blacklistThreshold,
+		}).Info("Key blacklisted due to excessive failures")
+	} else {
+		// 失败但未达到拉黑阈值，放回活跃池
+		activeKey := p.getRedisKey(groupID, PoolTypeActive)
+		if err := p.shardedStore.LPush(activeKey, keyID); err != nil {
+			return NewPoolErrorWithCause(ErrorTypeStorage, "RETURN_FAILED", "Failed to return failed key to active pool", err)
+		}
+	}
+
+	// 更新密钥详情
+	if err := p.setKeyDetails(keyID, updates); err != nil {
+		return NewPoolErrorWithCause(ErrorTypeStorage, "UPDATE_DETAILS_FAILED", "Failed to update key details", err)
+	}
+
+	return nil
+}
+
+// addToCoolingPool 添加密钥到冷却池
+func (p *MemoryLayeredPool) addToCoolingPool(groupID uint, keyID uint, resetAt time.Time) error {
+	coolingKey := p.getRedisKey(groupID, PoolTypeCooling)
+
+	// 使用时间戳作为score
+	score := float64(resetAt.Unix())
+
+	// 使用ZADD操作添加到有序集合
+	return p.shardedStore.ZAdd(coolingKey, score, keyID)
+}
+
+// getExpiredFromCoolingPool 获取已过期的冷却密钥
+func (p *MemoryLayeredPool) getExpiredFromCoolingPool(groupID uint) ([]uint, error) {
+	coolingKey := p.getRedisKey(groupID, PoolTypeCooling)
+	now := time.Now().Unix()
+
+	// 获取score <= now的成员
+	members, err := p.shardedStore.ZRangeByScore(coolingKey, 0, float64(now))
+	if err != nil {
+		return nil, err
+	}
+
+	expiredKeys := make([]uint, 0, len(members))
+	for _, member := range members {
+		if keyID, err := strconv.ParseUint(member, 10, 64); err == nil {
+			expiredKeys = append(expiredKeys, uint(keyID))
+		}
+	}
+
+	return expiredKeys, nil
+}
+
+// removeFromCoolingPool 从冷却池移除密钥
+func (p *MemoryLayeredPool) removeFromCoolingPool(groupID uint, keyIDs []uint) error {
+	coolingKey := p.getRedisKey(groupID, PoolTypeCooling)
+
+	members := make([]interface{}, len(keyIDs))
+	for i, keyID := range keyIDs {
+		members[i] = keyID
+	}
+
+	return p.shardedStore.ZRem(coolingKey, members...)
+}
+
+// incrementRateLimitCount 增加429计数
+func (p *MemoryLayeredPool) incrementRateLimitCount(details map[string]string) int64 {
+	rateLimitCount, _ := strconv.ParseInt(details["rate_limit_count"], 10, 64)
+	return rateLimitCount + 1
+}
+
+// recoverSingleCooledKey 恢复单个冷却密钥
+func (p *MemoryLayeredPool) recoverSingleCooledKey(groupID, keyID uint) error {
+	// 从冷却池移除
+	if err := p.removeFromCoolingPool(groupID, []uint{keyID}); err != nil {
+		return err
+	}
+
+	// 更新密钥状态
+	updates := map[string]interface{}{
+		"status":               models.KeyStatusActive,
+		"rate_limit_reset_at":  nil,
+	}
+	if err := p.setKeyDetails(keyID, updates); err != nil {
+		return err
+	}
+
+	// 添加到就绪池
+	if err := p.addToReadyPool(groupID, []uint{keyID}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// getPoolSize 获取池大小
+func (p *MemoryLayeredPool) getPoolSize(groupID uint, poolType PoolType) (int64, error) {
+	switch poolType {
+	case PoolTypeValidation:
+		validationKey := p.getRedisKey(groupID, PoolTypeValidation)
+		members, err := p.shardedStore.SMembers(validationKey)
+		if err != nil {
+			return 0, err
+		}
+		return int64(len(members)), nil
+
+	case PoolTypeReady, PoolTypeActive:
+		poolKey := p.getRedisKey(groupID, poolType)
+		return p.shardedStore.LLen(poolKey)
+
+	case PoolTypeCooling:
+		coolingKey := p.getRedisKey(groupID, PoolTypeCooling)
+		return p.shardedStore.ZCard(coolingKey)
+
+	default:
+		return 0, NewPoolError(ErrorTypeValidation, "UNKNOWN_POOL_TYPE", "Unknown pool type")
+	}
+}
+
+// moveToActivePool 将密钥从就绪池移动到活跃池
+func (p *MemoryLayeredPool) moveToActivePool(groupID uint, count int) ([]uint, error) {
+	readyKey := p.getRedisKey(groupID, PoolTypeReady)
+	activeKey := p.getRedisKey(groupID, PoolTypeActive)
+
+	var movedKeys []uint
+
+	for i := 0; i < count; i++ {
+		// 从就绪池弹出一个密钥
+		keyIDStr, err := p.shardedStore.Rotate(readyKey)
+		if err != nil {
+			if err == store.ErrNotFound {
+				break // 就绪池为空
+			}
+			return movedKeys, err
+		}
+
+		keyID, err := strconv.ParseUint(keyIDStr, 10, 64)
+		if err != nil {
+			continue
+		}
+
+		// 添加到活跃池
+		if err := p.shardedStore.LPush(activeKey, uint(keyID)); err != nil {
+			return movedKeys, err
+		}
+
+		movedKeys = append(movedKeys, uint(keyID))
+	}
+
+	return movedKeys, nil
+}
+
+// addKeysToPool 向指定池添加密钥的内部方法
+func (p *MemoryLayeredPool) addKeysToPool(groupID uint, keyIDs []uint, poolType PoolType) error {
+	if len(keyIDs) == 0 {
+		return nil
+	}
+
+	// 首先从数据库获取密钥详情
+	var keys []models.APIKey
+	if err := p.db.Where("id IN ? AND group_id = ?", keyIDs, groupID).Find(&keys).Error; err != nil {
+		return NewPoolErrorWithCause(ErrorTypeStorage, "DB_QUERY_FAILED", "Failed to query keys from database", err)
+	}
+
+	if len(keys) == 0 {
+		return NewPoolError(ErrorTypeValidation, "NO_KEYS_FOUND", "No valid keys found in database")
+	}
+
+	// 验证密钥状态
+	validKeyIDs := make([]uint, 0, len(keys))
+	for _, key := range keys {
+		if key.Status == models.KeyStatusActive || key.Status == models.KeyStatusRateLimited {
+			validKeyIDs = append(validKeyIDs, key.ID)
+		}
+	}
+
+	if len(validKeyIDs) == 0 {
+		return NewPoolError(ErrorTypeValidation, "NO_VALID_KEYS", "No valid keys to add to pool")
+	}
+
+	// 根据池类型执行不同的添加逻辑
+	switch poolType {
+	case PoolTypeValidation:
+		return p.addToValidationPool(groupID, validKeyIDs)
+	case PoolTypeReady:
+		return p.addToReadyPool(groupID, validKeyIDs)
+	case PoolTypeActive:
+		return p.addToActivePool(groupID, validKeyIDs)
+	case PoolTypeCooling:
+		// 冷却池需要特殊处理，不应该直接添加
+		return NewPoolError(ErrorTypeValidation, "INVALID_POOL_TYPE", "Cannot directly add keys to cooling pool")
+	default:
+		return NewPoolError(ErrorTypeValidation, "UNKNOWN_POOL_TYPE", "Unknown pool type")
+	}
+}
+
+// addToReadyPool 添加密钥到就绪池
+func (p *MemoryLayeredPool) addToReadyPool(groupID uint, keyIDs []uint) error {
+	if len(keyIDs) == 0 {
+		return nil
+	}
+
+	readyKey := p.getRedisKey(groupID, PoolTypeReady)
+
+	// 批量添加到就绪池
+	for _, keyID := range keyIDs {
+		if err := p.shardedStore.LPush(readyKey, keyID); err != nil {
+			return NewPoolErrorWithCause(ErrorTypeStorage, "LPUSH_FAILED", "Failed to add key to ready pool", err)
+		}
+	}
+
+	// 更新密钥详情到内存存储
+	for _, keyID := range keyIDs {
+		if err := p.syncKeyDetailsToRedis(keyID, groupID); err != nil {
+			logrus.WithFields(logrus.Fields{"keyID": keyID, "error": err}).Warn("Failed to sync key details to memory store")
+		}
+	}
+
+	// 发送事件
+	if p.eventHandler != nil {
+		event := &KeyPoolEvent{
+			Type:      EventPoolRefilled,
+			GroupID:   groupID,
+			PoolType:  PoolTypeReady,
+			Message:   fmt.Sprintf("Added %d keys to ready pool", len(keyIDs)),
+			Timestamp: time.Now(),
+			Metadata:  keyIDs,
+		}
+		p.eventHandler.HandleEvent(event)
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"groupID": groupID,
+		"count":   len(keyIDs),
+		"pool":    PoolTypeReady,
+	}).Info("Keys added to ready pool")
+
+	return nil
+}
+
+// addToValidationPool 添加密钥到验证池
+func (p *MemoryLayeredPool) addToValidationPool(groupID uint, keyIDs []uint) error {
+	if len(keyIDs) == 0 {
+		return nil
+	}
+
+	validationKey := p.getRedisKey(groupID, PoolTypeValidation)
+
+	// 转换为interface{}切片
+	members := make([]interface{}, len(keyIDs))
+	for i, keyID := range keyIDs {
+		members[i] = keyID
+	}
+
+	return p.shardedStore.SAdd(validationKey, members...)
+}
+
+// addToActivePool 添加密钥到活跃池
+func (p *MemoryLayeredPool) addToActivePool(groupID uint, keyIDs []uint) error {
+	if len(keyIDs) == 0 {
+		return nil
+	}
+
+	activeKey := p.getRedisKey(groupID, PoolTypeActive)
+
+	// 批量添加到活跃池
+	for _, keyID := range keyIDs {
+		if err := p.shardedStore.LPush(activeKey, keyID); err != nil {
+			return NewPoolErrorWithCause(ErrorTypeStorage, "LPUSH_FAILED", "Failed to add key to active pool", err)
+		}
+	}
+
+	// 更新密钥详情到内存存储
+	for _, keyID := range keyIDs {
+		if err := p.syncKeyDetailsToRedis(keyID, groupID); err != nil {
+			logrus.WithFields(logrus.Fields{"keyID": keyID, "error": err}).Warn("Failed to sync key details to memory store")
+		}
+	}
+
+	// 发送事件
+	if p.eventHandler != nil {
+		event := &KeyPoolEvent{
+			Type:      EventPoolRefilled,
+			GroupID:   groupID,
+			PoolType:  PoolTypeActive,
+			Message:   fmt.Sprintf("Added %d keys to active pool", len(keyIDs)),
+			Timestamp: time.Now(),
+			Metadata:  keyIDs,
+		}
+		p.eventHandler.HandleEvent(event)
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"groupID": groupID,
+		"count":   len(keyIDs),
+		"pool":    PoolTypeActive,
+	}).Info("Keys added to active pool")
+
+	return nil
+}
+
+// Set 设置缓存条目
+func (c *localKeyCache) Set(keyID uint, key *models.APIKey) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.cache[keyID] = &cacheEntry{
+		key:       key,
+		expiresAt: time.Now().Add(c.ttl),
+	}
+}
+
+// Get 获取缓存条目
+func (c *localKeyCache) Get(keyID uint) (*models.APIKey, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	entry, exists := c.cache[keyID]
+	if !exists {
+		return nil, false
+	}
+
+	// 检查是否过期
+	if time.Now().After(entry.expiresAt) {
+		// 过期了，删除并返回nil
+		delete(c.cache, keyID)
+		return nil, false
+	}
+
+	return entry.key, true
 }
 
 // Remove 从缓存中移除指定的密钥
@@ -1077,6 +1672,19 @@ func (c *localKeyCache) Remove(keyID uint) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.cache, keyID)
+}
+
+// cleanupExpired 清理过期的缓存条目
+func (c *localKeyCache) cleanupExpired() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now()
+	for keyID, entry := range c.cache {
+		if now.After(entry.expiresAt) {
+			delete(c.cache, keyID)
+		}
+	}
 }
 
 // UpdateConfig 更新本地缓存配置
@@ -1134,27 +1742,6 @@ func (c *localKeyCache) UpdateConfig(config *LocalCacheConfig) error {
 	}
 
 	return nil
-}
-
-// GetConfig 获取分组配置
-func (p *MemoryLayeredPool) GetConfig(groupID uint) (*PoolConfig, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	if config, exists := p.groupConfigs[groupID]; exists {
-		// 返回配置的副本
-		configCopy := *config
-		return &configCopy, nil
-	}
-
-	// 返回默认配置的副本
-	if p.config != nil {
-		configCopy := *p.config
-		configCopy.GroupID = groupID
-		return &configCopy, nil
-	}
-
-	return nil, NewPoolError(ErrorTypeConfiguration, "CONFIG_NOT_FOUND", "Configuration not found for group")
 }
 
 // GetKeyStatus 获取密钥状态
