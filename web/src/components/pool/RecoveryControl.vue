@@ -39,6 +39,9 @@ const dialog = useDialog();
 
 // 批量恢复表单
 const batchRecoveryForm = ref<BatchRecoveryRequest>({
+  recovery_type: "immediate",
+  key_selection: "all_rate_limited",
+  recovery_strategy: "balanced",
   max_keys: 10,
   priority_level: "normal",
   force_recovery: false,

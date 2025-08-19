@@ -90,7 +90,6 @@ const overallHealth = computed(() => {
               <n-statistic
                 label="活跃密钥"
                 :value="poolStats.priority_pool?.active_count || 0"
-                :value="poolStats.priority_pool?.active_count || 0"
                 class="pool-stat"
               />
               <n-progress
@@ -120,7 +119,6 @@ const overallHealth = computed(() => {
               <n-statistic
                 label="就绪密钥"
                 :value="poolStats.ready_pool?.active_count || 0"
-                :value="poolStats.ready_pool?.active_count || 0"
                 class="pool-stat"
               />
               <n-progress
@@ -128,7 +126,7 @@ const overallHealth = computed(() => {
                 :percentage="
                   ((poolStats.ready_pool?.active_count || 0) /
                     Math.max(poolStats.ready_pool?.total_count || 1, 1)) *
-                  100
+                    100
                 "
                 :color="poolStatusColors.ready === 'success' ? '#10b981' : '#f59e0b'"
                 :show-indicator="false"
@@ -150,7 +148,6 @@ const overallHealth = computed(() => {
               <n-statistic
                 label="使用中密钥"
                 :value="poolStats.active_pool?.active_count || 0"
-                :value="poolStats.active_pool?.active_count || 0"
                 class="pool-stat"
               />
               <n-progress
@@ -158,7 +155,7 @@ const overallHealth = computed(() => {
                 :percentage="
                   ((poolStats.active_pool?.active_count || 0) /
                     Math.max(poolStats.active_pool?.total_count || 1, 1)) *
-                  100
+                    100
                 "
                 :color="poolStatusColors.active === 'success' ? '#10b981' : '#ef4444'"
                 :show-indicator="false"
@@ -180,7 +177,6 @@ const overallHealth = computed(() => {
               <n-statistic
                 label="冷却密钥"
                 :value="poolStats.cooling_pool?.active_count || 0"
-                :value="poolStats.cooling_pool?.active_count || 0"
                 class="pool-stat"
               />
               <n-progress
@@ -188,7 +184,7 @@ const overallHealth = computed(() => {
                 :percentage="
                   ((poolStats.cooling_pool?.active_count || 0) /
                     Math.max(poolStats.cooling_pool?.total_count || 1, 1)) *
-                  100
+                    100
                 "
                 color="#6366f1"
                 :show-indicator="false"

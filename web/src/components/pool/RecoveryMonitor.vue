@@ -22,7 +22,6 @@ interface Props {
   recoveryMetrics: RecoveryMetrics | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const props = defineProps<Props>();
 
 // 格式化时间
