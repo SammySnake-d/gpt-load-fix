@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,14 +15,14 @@ type RateLimitMonitor struct {
 	totalRateLimitErrors int64
 	rateLimitsByKey      map[uint]*KeyRateLimitStats
 	rateLimitsByGroup    map[uint]*GroupRateLimitStats
-	
+
 	// 时间窗口统计
 	recentErrors         []RateLimitEvent
 	windowSize           time.Duration
-	
+
 	// 同步
 	mu sync.RWMutex
-	
+
 	// 配置
 	config *MonitorConfig
 }
@@ -96,7 +97,7 @@ func NewRateLimitMonitor(config *MonitorConfig) *RateLimitMonitor {
 	if config == nil {
 		config = DefaultMonitorConfig()
 	}
-	
+
 	return &RateLimitMonitor{
 		rateLimitsByKey:   make(map[uint]*KeyRateLimitStats),
 		rateLimitsByGroup: make(map[uint]*GroupRateLimitStats),
@@ -110,12 +111,12 @@ func NewRateLimitMonitor(config *MonitorConfig) *RateLimitMonitor {
 func (m *RateLimitMonitor) RecordRateLimitError(keyID, groupID uint, rateLimitErr *RateLimitError) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	now := time.Now()
-	
+
 	// 增加总计数
 	atomic.AddInt64(&m.totalRateLimitErrors, 1)
-	
+
 	// 创建事件
 	event := RateLimitEvent{
 		Timestamp:    now,
@@ -128,26 +129,26 @@ func (m *RateLimitMonitor) RecordRateLimitError(keyID, groupID uint, rateLimitEr
 		Pattern:      m.analyzeErrorPattern(rateLimitErr.Message),
 		Severity:     m.calculateSeverity(rateLimitErr.RetryAfter),
 	}
-	
+
 	// 添加到最近事件列表
 	m.recentErrors = append(m.recentErrors, event)
-	
+
 	// 限制事件数量
 	if len(m.recentErrors) > m.config.MaxEvents {
 		m.recentErrors = m.recentErrors[len(m.recentErrors)-m.config.MaxEvents:]
 	}
-	
+
 	// 更新密钥统计
 	m.updateKeyStats(keyID, event)
-	
+
 	// 更新分组统计
 	m.updateGroupStats(groupID, event)
-	
+
 	// 检查告警条件
 	if m.config.EnableAlerts {
 		m.checkAlertConditions(keyID, groupID, event)
 	}
-	
+
 	logrus.WithFields(logrus.Fields{
 		"keyID":     keyID,
 		"groupID":   groupID,
@@ -168,16 +169,16 @@ func (m *RateLimitMonitor) updateKeyStats(keyID uint, event RateLimitEvent) {
 		}
 		m.rateLimitsByKey[keyID] = stats
 	}
-	
+
 	stats.TotalCount++
 	stats.LastOccurrence = event.Timestamp
-	
+
 	// 计算平均间隔
 	if stats.TotalCount > 1 {
 		totalDuration := stats.LastOccurrence.Sub(stats.FirstOccurrence)
 		stats.AverageInterval = totalDuration / time.Duration(stats.TotalCount-1)
 	}
-	
+
 	// 计算最近1小时的次数
 	oneHourAgo := event.Timestamp.Add(-1 * time.Hour)
 	recentCount := int64(0)
@@ -201,10 +202,10 @@ func (m *RateLimitMonitor) updateGroupStats(groupID uint, event RateLimitEvent) 
 		}
 		m.rateLimitsByGroup[groupID] = stats
 	}
-	
+
 	stats.TotalCount++
 	stats.LastOccurrence = event.Timestamp
-	
+
 	// 计算受影响的密钥数量
 	affectedKeys := make(map[uint]bool)
 	for _, e := range m.recentErrors {
@@ -213,13 +214,13 @@ func (m *RateLimitMonitor) updateGroupStats(groupID uint, event RateLimitEvent) 
 		}
 	}
 	stats.AffectedKeys = len(affectedKeys)
-	
+
 	// 计算平均间隔
 	if stats.TotalCount > 1 {
 		totalDuration := stats.LastOccurrence.Sub(stats.FirstOccurrence)
 		stats.AverageInterval = totalDuration / time.Duration(stats.TotalCount-1)
 	}
-	
+
 	// 计算最近1小时的次数
 	oneHourAgo := event.Timestamp.Add(-1 * time.Hour)
 	recentCount := int64(0)
@@ -238,9 +239,9 @@ func (m *RateLimitMonitor) analyzeErrorPattern(errorMessage string) string {
 	if !m.config.EnablePatternAnalysis {
 		return "unknown"
 	}
-	
+
 	errorLower := strings.ToLower(errorMessage)
-	
+
 	// 定义错误模式
 	patterns := map[string][]string{
 		"quota_exceeded": {"quota exceeded", "quota_exceeded", "daily limit", "monthly limit"},
@@ -254,7 +255,7 @@ func (m *RateLimitMonitor) analyzeErrorPattern(errorMessage string) string {
 		"azure_limit":    {"azure", "microsoft"},
 		"aws_limit":      {"aws", "amazon", "bedrock"},
 	}
-	
+
 	for pattern, keywords := range patterns {
 		for _, keyword := range keywords {
 			if strings.Contains(errorLower, keyword) {
@@ -262,7 +263,7 @@ func (m *RateLimitMonitor) analyzeErrorPattern(errorMessage string) string {
 			}
 		}
 	}
-	
+
 	return "generic"
 }
 
@@ -271,7 +272,7 @@ func (m *RateLimitMonitor) calculateSeverity(retryAfter time.Duration) RateLimit
 	if retryAfter == 0 {
 		return SeverityLow
 	}
-	
+
 	if retryAfter < 5*time.Minute {
 		return SeverityLow
 	} else if retryAfter < 1*time.Hour {
@@ -296,7 +297,7 @@ func (m *RateLimitMonitor) checkAlertConditions(keyID, groupID uint, event RateL
 			})
 		}
 	}
-	
+
 	// 检查分组级别告警
 	if groupStats, exists := m.rateLimitsByGroup[groupID]; exists {
 		if groupStats.RecentCount >= m.config.AlertThreshold*2 { // 分组阈值更高
@@ -316,7 +317,7 @@ func (m *RateLimitMonitor) triggerAlert(alertType string, data map[string]interf
 		"alertType": alertType,
 		"data":      data,
 	}).Warn("Rate limit alert triggered")
-	
+
 	// 这里可以集成到告警系统，如发送邮件、Slack通知等
 }
 
@@ -329,13 +330,13 @@ func (m *RateLimitMonitor) GetTotalRateLimitErrors() int64 {
 func (m *RateLimitMonitor) GetKeyStats(keyID uint) *KeyRateLimitStats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	if stats, exists := m.rateLimitsByKey[keyID]; exists {
 		// 返回副本
 		statsCopy := *stats
 		return &statsCopy
 	}
-	
+
 	return nil
 }
 
@@ -343,13 +344,13 @@ func (m *RateLimitMonitor) GetKeyStats(keyID uint) *KeyRateLimitStats {
 func (m *RateLimitMonitor) GetGroupStats(groupID uint) *GroupRateLimitStats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	if stats, exists := m.rateLimitsByGroup[groupID]; exists {
 		// 返回副本
 		statsCopy := *stats
 		return &statsCopy
 	}
-	
+
 	return nil
 }
 
@@ -357,16 +358,16 @@ func (m *RateLimitMonitor) GetGroupStats(groupID uint) *GroupRateLimitStats {
 func (m *RateLimitMonitor) GetRecentEvents(limit int) []RateLimitEvent {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	if limit <= 0 || limit > len(m.recentErrors) {
 		limit = len(m.recentErrors)
 	}
-	
+
 	// 返回最近的事件
 	start := len(m.recentErrors) - limit
 	events := make([]RateLimitEvent, limit)
 	copy(events, m.recentErrors[start:])
-	
+
 	return events
 }
 
@@ -374,13 +375,13 @@ func (m *RateLimitMonitor) GetRecentEvents(limit int) []RateLimitEvent {
 func (m *RateLimitMonitor) GetAllKeyStats() map[uint]*KeyRateLimitStats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	result := make(map[uint]*KeyRateLimitStats)
 	for keyID, stats := range m.rateLimitsByKey {
 		statsCopy := *stats
 		result[keyID] = &statsCopy
 	}
-	
+
 	return result
 }
 
@@ -388,13 +389,13 @@ func (m *RateLimitMonitor) GetAllKeyStats() map[uint]*KeyRateLimitStats {
 func (m *RateLimitMonitor) GetAllGroupStats() map[uint]*GroupRateLimitStats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	result := make(map[uint]*GroupRateLimitStats)
 	for groupID, stats := range m.rateLimitsByGroup {
 		statsCopy := *stats
 		result[groupID] = &statsCopy
 	}
-	
+
 	return result
 }
 
@@ -402,9 +403,9 @@ func (m *RateLimitMonitor) GetAllGroupStats() map[uint]*GroupRateLimitStats {
 func (m *RateLimitMonitor) CleanupOldEvents() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	cutoff := time.Now().Add(-m.windowSize)
-	
+
 	// 过滤掉过期事件
 	var filteredEvents []RateLimitEvent
 	for _, event := range m.recentErrors {
@@ -412,9 +413,9 @@ func (m *RateLimitMonitor) CleanupOldEvents() {
 			filteredEvents = append(filteredEvents, event)
 		}
 	}
-	
+
 	m.recentErrors = filteredEvents
-	
+
 	logrus.WithField("remainingEvents", len(m.recentErrors)).Debug("Cleaned up old rate limit events")
 }
 
@@ -422,11 +423,11 @@ func (m *RateLimitMonitor) CleanupOldEvents() {
 func (m *RateLimitMonitor) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	atomic.StoreInt64(&m.totalRateLimitErrors, 0)
 	m.rateLimitsByKey = make(map[uint]*KeyRateLimitStats)
 	m.rateLimitsByGroup = make(map[uint]*GroupRateLimitStats)
 	m.recentErrors = make([]RateLimitEvent, 0)
-	
+
 	logrus.Info("Rate limit monitor reset")
 }
