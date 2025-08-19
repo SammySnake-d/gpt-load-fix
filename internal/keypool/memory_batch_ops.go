@@ -2,9 +2,7 @@ package keypool
 
 import (
 	"context"
-	"fmt"
 	"gpt-load/internal/models"
-	"gpt-load/internal/store"
 	"sync"
 	"time"
 

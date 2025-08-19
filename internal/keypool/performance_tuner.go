@@ -3,7 +3,6 @@ package keypool
 import (
 	"context"
 	"fmt"
-	"gpt-load/internal/store"
 	"runtime"
 	"sync"
 	"sync/atomic"

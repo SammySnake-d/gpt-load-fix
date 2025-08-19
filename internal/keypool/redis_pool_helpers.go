@@ -3,8 +3,6 @@ package keypool
 import (
 	"fmt"
 	"gpt-load/internal/models"
-	"gpt-load/internal/store"
-	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"

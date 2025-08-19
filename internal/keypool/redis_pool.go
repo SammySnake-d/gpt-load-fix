@@ -363,6 +363,7 @@ func (p *RedisLayeredPool) moveToReadyPool(groupID uint, keyIDs []uint) error {
 		}
 
 		// 添加到就绪池
+		readyKey := p.getRedisKey(groupID, PoolTypeReady)
 		for _, keyID := range keyIDs {
 			pipe.LPush(readyKey, keyID)
 		}
@@ -371,6 +372,7 @@ func (p *RedisLayeredPool) moveToReadyPool(groupID uint, keyIDs []uint) error {
 	}
 
 	// 回退到单个操作
+	readyKey := p.getRedisKey(groupID, PoolTypeReady)
 	for _, keyID := range keyIDs {
 		// 从验证池移除（需要实现SREM）
 		// 添加到就绪池
@@ -420,7 +422,7 @@ func (p *RedisLayeredPool) addToCoolingPool(groupID uint, keyID uint, resetAt ti
 	coolingKey := p.getRedisKey(groupID, PoolTypeCooling)
 
 	// 使用时间戳作为score
-	score := float64(resetAt.Unix())
+	_ = float64(resetAt.Unix())
 
 	// 注意：这里需要实现ZADD操作，当前store接口可能需要扩展
 	// 临时使用Set操作，实际应该使用ZADD
@@ -429,8 +431,8 @@ func (p *RedisLayeredPool) addToCoolingPool(groupID uint, keyID uint, resetAt ti
 
 // getExpiredFromCoolingPool 获取已过期的冷却密钥
 func (p *RedisLayeredPool) getExpiredFromCoolingPool(groupID uint) ([]uint, error) {
-	coolingKey := p.getRedisKey(groupID, PoolTypeCooling)
-	now := time.Now().Unix()
+	_ = p.getRedisKey(groupID, PoolTypeCooling)
+	_ = time.Now().Unix()
 
 	// 注意：这里需要实现ZRANGEBYSCORE操作
 	// 临时实现，实际应该使用ZRANGEBYSCORE获取score <= now的成员
@@ -490,7 +492,7 @@ func (p *RedisLayeredPool) SelectKey(groupID uint) (*models.APIKey, error) {
 		}
 	}()
 
-	config := p.getGroupConfig(groupID)
+	_ = p.getGroupConfig(groupID)
 
 	// 尝试从活跃池获取密钥
 	activeKey := p.getRedisKey(groupID, PoolTypeActive)
