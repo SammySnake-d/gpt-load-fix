@@ -979,3 +979,97 @@ func (p *MemoryLayeredPool) GetKeyStatus(keyID uint) (KeyStatus, error) {
 	// 如果在所有池中都找不到，可能是无效密钥
 	return KeyStatusInvalid, nil
 }
+
+// ListKeys 列出指定池中的密钥
+func (p *MemoryLayeredPool) ListKeys(groupID uint, poolType PoolType) ([]uint, error) {
+	switch poolType {
+	case PoolTypeValidation:
+		return p.listValidationKeys(groupID)
+	case PoolTypeReady:
+		return p.listReadyKeys(groupID)
+	case PoolTypeActive:
+		return p.listActiveKeys(groupID)
+	case PoolTypeCooling:
+		return p.listCoolingKeys(groupID)
+	default:
+		return nil, NewPoolError(ErrorTypeValidation, "UNKNOWN_POOL_TYPE", "Unknown pool type")
+	}
+}
+
+// listValidationKeys 列出验证池中的密钥
+func (p *MemoryLayeredPool) listValidationKeys(groupID uint) ([]uint, error) {
+	validationKey := p.getRedisKey(groupID, PoolTypeValidation)
+	members, err := p.shardedStore.SMembers(validationKey)
+	if err != nil {
+		return nil, NewPoolErrorWithCause(ErrorTypeStorage, "SMEMBERS_FAILED", "Failed to list validation keys", err)
+	}
+
+	keyIDs := make([]uint, 0, len(members))
+	for _, member := range members {
+		if keyID, err := strconv.ParseUint(member, 10, 64); err == nil {
+			keyIDs = append(keyIDs, uint(keyID))
+		}
+	}
+
+	return keyIDs, nil
+}
+
+// listReadyKeys 列出就绪池中的密钥
+func (p *MemoryLayeredPool) listReadyKeys(groupID uint) ([]uint, error) {
+	readyKey := p.getRedisKey(groupID, PoolTypeReady)
+
+	// 获取列表中的所有元素
+	list, err := p.shardedStore.LRange(readyKey, 0, -1)
+	if err != nil {
+		return nil, NewPoolErrorWithCause(ErrorTypeStorage, "LRANGE_FAILED", "Failed to list ready keys", err)
+	}
+
+	keyIDs := make([]uint, 0, len(list))
+	for _, item := range list {
+		if keyID, err := strconv.ParseUint(item, 10, 64); err == nil {
+			keyIDs = append(keyIDs, uint(keyID))
+		}
+	}
+
+	return keyIDs, nil
+}
+
+// listActiveKeys 列出活跃池中的密钥
+func (p *MemoryLayeredPool) listActiveKeys(groupID uint) ([]uint, error) {
+	activeKey := p.getRedisKey(groupID, PoolTypeActive)
+
+	// 获取列表中的所有元素
+	list, err := p.shardedStore.LRange(activeKey, 0, -1)
+	if err != nil {
+		return nil, NewPoolErrorWithCause(ErrorTypeStorage, "LRANGE_FAILED", "Failed to list active keys", err)
+	}
+
+	keyIDs := make([]uint, 0, len(list))
+	for _, item := range list {
+		if keyID, err := strconv.ParseUint(item, 10, 64); err == nil {
+			keyIDs = append(keyIDs, uint(keyID))
+		}
+	}
+
+	return keyIDs, nil
+}
+
+// listCoolingKeys 列出冷却池中的密钥
+func (p *MemoryLayeredPool) listCoolingKeys(groupID uint) ([]uint, error) {
+	coolingKey := p.getRedisKey(groupID, PoolTypeCooling)
+
+	// 获取有序集合中的所有元素
+	members, err := p.shardedStore.ZRange(coolingKey, 0, -1)
+	if err != nil {
+		return nil, NewPoolErrorWithCause(ErrorTypeStorage, "ZRANGE_FAILED", "Failed to list cooling keys", err)
+	}
+
+	keyIDs := make([]uint, 0, len(members))
+	for _, member := range members {
+		if keyID, err := strconv.ParseUint(member, 10, 64); err == nil {
+			keyIDs = append(keyIDs, uint(keyID))
+		}
+	}
+
+	return keyIDs, nil
+}

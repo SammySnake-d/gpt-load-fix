@@ -131,15 +131,25 @@ func (pm *PoolManager) createRedisPool(group *models.Group) (LayeredKeyPool, err
 
 	// 创建Redis池配置
 	redisConfig := &RedisPoolConfig{
-		KeyPrefix:      fmt.Sprintf("pool:%d:", group.ID),
-		DefaultTTL:     3600, // 1小时
-		EnablePipeline: true,
-		PipelineSize:   100,
-		EnableMetrics:  true,
+		KeyPrefix:        fmt.Sprintf("pool:%d:", group.ID),
+		BatchSize:        100,
+		PipelineSize:     10,
+		ConnectionPool:   10,
+		CommandTimeout:   5 * time.Second,
+		EnableClustering: false,
+	}
+
+	// 创建工厂配置
+	factoryConfig := &FactoryConfig{
+		RedisConfig:         redisConfig,
+		DefaultPoolConfig:   DefaultPoolConfig(group.ID),
+		Store:               pm.redisStore,
+		DB:                  pm.db,
+		SettingsManager:     nil, // 可以根据需要设置
 	}
 
 	// 创建Redis池实例
-	pool, err := NewRedisLayeredPool(pm.db, pm.redisStore, redisConfig)
+	pool, err := NewRedisLayeredPool(factoryConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -158,13 +168,21 @@ func (pm *PoolManager) createMemoryPool(group *models.Group) (LayeredKeyPool, er
 	memoryConfig := &MemoryPoolConfig{
 		ShardCount:     8,
 		EnableSharding: true,
-		LockTimeout:    1000, // 1秒
-		GCInterval:     600,  // 10分钟
+		LockTimeout:    1 * time.Second,
+		GCInterval:     10 * time.Minute,
 		MaxMemoryUsage: 100 * 1024 * 1024, // 100MB
 	}
 
+	// 创建工厂配置
+	factoryConfig := &FactoryConfig{
+		MemoryConfig:        memoryConfig,
+		DefaultPoolConfig:   DefaultPoolConfig(group.ID),
+		DB:                  pm.db,
+		SettingsManager:     nil, // 可以根据需要设置
+	}
+
 	// 创建内存池实例
-	pool, err := NewMemoryLayeredPool(pm.db, memoryConfig)
+	pool, err := NewMemoryLayeredPool(factoryConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +359,7 @@ func (pm *PoolManager) HealthCheck() map[uint]bool {
 
 	for groupID, pool := range pm.pools {
 		// 简单的健康检查：尝试获取统计信息
-		_, err := pool.GetStats(groupID)
+		_, err := pool.GetPoolStats(groupID)
 		health[groupID] = (err == nil)
 	}
 

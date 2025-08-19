@@ -180,17 +180,12 @@ func (ca *ConfigApplier) applyMemoryPoolConfig(pool *MemoryLayeredPool, config *
 func (ca *ConfigApplier) applyRedisPoolConfig(pool *RedisLayeredPool, config *OptimizerOptimalConfig) error {
 	// 更新Redis配置
 	redisConfig := &RedisPoolConfig{
-		KeyPrefix:      pool.redisConfig.KeyPrefix, // 保持原有前缀
-		DefaultTTL:     3600,
-		EnablePipeline: true,
-		PipelineSize:   config.BatchSize,
-		EnableMetrics:  true,
-		MaxRetries:     3,
-		RetryDelay:     100 * time.Millisecond,
-		PoolSize:       config.MaxConcurrency,
-		MinIdleConns:   config.MaxConcurrency / 4,
-		MaxConnAge:     30 * time.Minute,
-		IdleTimeout:    5 * time.Minute,
+		KeyPrefix:        pool.redisConfig.KeyPrefix, // 保持原有前缀
+		BatchSize:        config.BatchSize,
+		PipelineSize:     config.BatchSize,
+		ConnectionPool:   config.MaxConcurrency,
+		CommandTimeout:   config.SelectTimeout,
+		EnableClustering: false,
 	}
 
 	// 应用Redis配置

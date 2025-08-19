@@ -548,6 +548,57 @@ func (s *ShardedMemoryStore) Rotate(key string) (string, error) {
 	return item, nil
 }
 
+// LRange 获取列表指定范围的元素
+func (s *ShardedMemoryStore) LRange(key string, start, stop int) ([]string, error) {
+	shard := s.getShard(key)
+
+	shard.mu.RLock()
+	defer shard.mu.RUnlock()
+
+	rawList, exists := shard.data[key]
+	if !exists {
+		return []string{}, nil
+	}
+
+	list, ok := rawList.([]string)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: key '%s' holds a different data type", key)
+	}
+
+	length := len(list)
+	if length == 0 {
+		return []string{}, nil
+	}
+
+	// 处理负数索引
+	if start < 0 {
+		start = length + start
+	}
+	if stop < 0 {
+		stop = length + stop
+	}
+
+	// 边界检查
+	if start < 0 {
+		start = 0
+	}
+	if stop >= length {
+		stop = length - 1
+	}
+	if start > stop {
+		return []string{}, nil
+	}
+
+	result := make([]string, stop-start+1)
+	copy(result, list[start:stop+1])
+
+	if s.config.EnableMetrics {
+		shard.metrics.readCount++
+	}
+
+	return result, nil
+}
+
 // --- SET operations ---
 
 // SAdd 向集合添加成员
@@ -748,6 +799,61 @@ func (s *ShardedMemoryStore) ZRem(key string, members ...any) error {
 	}
 
 	return nil
+}
+
+// ZRange 获取有序集合指定范围的成员
+func (s *ShardedMemoryStore) ZRange(key string, start, stop int) ([]string, error) {
+	shard := s.getShard(key)
+
+	shard.mu.RLock()
+	defer shard.mu.RUnlock()
+
+	rawZset, exists := shard.data[key]
+	if !exists {
+		return []string{}, nil
+	}
+
+	zs, ok := rawZset.(*shardedZSet)
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: key '%s' holds a different data type", key)
+	}
+
+	s.ensureSorted(zs)
+
+	length := len(zs.sorted)
+	if length == 0 {
+		return []string{}, nil
+	}
+
+	// 处理负数索引
+	if start < 0 {
+		start = length + start
+	}
+	if stop < 0 {
+		stop = length + stop
+	}
+
+	// 边界检查
+	if start < 0 {
+		start = 0
+	}
+	if stop >= length {
+		stop = length - 1
+	}
+	if start > stop {
+		return []string{}, nil
+	}
+
+	result := make([]string, 0, stop-start+1)
+	for i := start; i <= stop; i++ {
+		result = append(result, zs.sorted[i].Member)
+	}
+
+	if s.config.EnableMetrics {
+		shard.metrics.readCount++
+	}
+
+	return result, nil
 }
 
 // ZRangeByScore 按分数范围获取成员
