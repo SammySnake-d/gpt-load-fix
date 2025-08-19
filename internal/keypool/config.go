@@ -29,7 +29,7 @@ type EnhancedKeyProvider struct {
 	config          *EnhancedProviderConfig
 
 	// 分层池
-	layeredPool     LayeredPool
+	layeredPool     LayeredKeyPool
 
 	// 状态
 	usingLayeredPool bool
@@ -69,9 +69,12 @@ func (e *EnhancedKeyProvider) IsUsingLayeredPool() bool {
 }
 
 // SwitchToLayeredPool 切换到分层池模式
-func (e *EnhancedKeyProvider) SwitchToLayeredPool() error {
+func (e *EnhancedKeyProvider) SwitchToLayeredPool(config *EnhancedProviderConfig) error {
 	e.usingLayeredPool = true
 	e.config.UseLayeredPool = true
+	if config != nil {
+		e.config = config
+	}
 	return nil
 }
 

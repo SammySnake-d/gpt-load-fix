@@ -905,3 +905,24 @@ func (c *localKeyCache) UpdateConfig(config *LocalCacheConfig) error {
 
 	return nil
 }
+
+// GetConfig 获取分组配置
+func (p *MemoryLayeredPool) GetConfig(groupID uint) (*PoolConfig, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if config, exists := p.groupConfigs[groupID]; exists {
+		// 返回配置的副本
+		configCopy := *config
+		return &configCopy, nil
+	}
+
+	// 返回默认配置的副本
+	if p.config != nil {
+		configCopy := *p.config
+		configCopy.GroupID = groupID
+		return &configCopy, nil
+	}
+
+	return nil, NewPoolError(ErrorTypeConfiguration, "CONFIG_NOT_FOUND", "Configuration not found for group")
+}

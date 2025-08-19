@@ -111,38 +111,33 @@ func (ca *ConfigApplier) ApplyOptimalConfig(groupID uint, config *OptimizerOptim
 // convertToPoolConfig 转换为池配置
 func (ca *ConfigApplier) convertToPoolConfig(optimal *OptimizerOptimalConfig) *PoolConfig {
 	return &PoolConfig{
+		GroupID: 0, // 将在应用时设置
+
 		// 池大小配置
-		ValidationPoolSize: optimal.CacheSize / 4,
-		ReadyPoolSize:      optimal.CacheSize / 2,
-		ActivePoolSize:     optimal.CacheSize / 4,
+		MinActiveKeys: optimal.CacheSize / 4,
+		MaxActiveKeys: optimal.CacheSize / 2,
+		MinReadyKeys:  optimal.CacheSize / 8,
+		MaxReadyKeys:  optimal.CacheSize / 4,
 
-		// 批量操作配置
-		BatchSize:          optimal.BatchSize,
-		MaxBatchSize:       optimal.BatchSize * 2,
-		BatchTimeout:       optimal.SelectTimeout,
+		// 补充策略配置
+		RefillThreshold: 0.3, // 30%
+		RefillBatchSize: optimal.BatchSize,
 
-		// 并发配置
-		MaxConcurrency:     optimal.MaxConcurrency,
-		WorkerPoolSize:     optimal.WorkerPoolSize,
-		QueueSize:          optimal.QueueSize,
-
-		// 超时配置
-		SelectTimeout:      optimal.SelectTimeout,
-		ReturnTimeout:      optimal.ReturnTimeout,
-		RecoveryTimeout:    optimal.RecoveryTimeout,
+		// 验证配置
+		ValidationTimeout:     optimal.SelectTimeout,
+		ValidationConcurrency: optimal.MaxConcurrency / 2,
 
 		// 恢复配置
-		RecoveryInterval:   5 * time.Minute,
-		RecoveryBatchSize:  optimal.BatchSize,
-		MaxRecoveryRetries: 3,
+		RecoveryEnabled:       true,
+		RecoveryTimeout:       optimal.RecoveryTimeout,
+		RecoveryBatchSize:     optimal.BatchSize / 2,
+		RecoveryConcurrency:   optimal.WorkerPoolSize,
 
-		// 监控配置
-		EnableMetrics:      true,
-		MetricsInterval:    30 * time.Second,
-
-		// 健康检查配置
-		HealthCheckInterval: 1 * time.Minute,
-		HealthCheckTimeout:  10 * time.Second,
+		// 性能配置
+		EnableMetrics:         true,
+		EnableEvents:          true,
+		HealthCheckInterval:   30 * time.Second,
+		HealthCheckTimeout:    10 * time.Second,
 	}
 }
 
