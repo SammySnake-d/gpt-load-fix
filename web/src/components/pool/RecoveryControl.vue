@@ -145,21 +145,23 @@ function handleQuickAction() {
       <!-- 恢复建议 -->
       <div class="recommendation-section" v-if="recoveryRecommendation">
         <n-alert
-          :type="recoveryRecommendation.type"
+          :type="recoveryRecommendation.type as 'info' | 'success' | 'warning' | 'error'"
           :title="recoveryRecommendation.type === 'success' ? '状态良好' : '恢复建议'"
           closable
         >
           {{ recoveryRecommendation.message }}
-          <template #action v-if="recoveryRecommendation.action">
-            <n-button
-              size="small"
-              :type="recoveryRecommendation.type === 'error' ? 'error' : 'primary'"
-              @click="handleQuickAction"
-            >
-              快速执行
-            </n-button>
-          </template>
         </n-alert>
+
+        <!-- 快速操作按钮 -->
+        <div v-if="recoveryRecommendation.action" style="margin-top: 12px;">
+          <n-button
+            size="small"
+            :type="recoveryRecommendation.type === 'error' ? 'error' : 'primary'"
+            @click="handleQuickAction"
+          >
+            快速执行
+          </n-button>
+        </div>
       </div>
 
       <!-- 批量恢复控制 -->
@@ -237,11 +239,11 @@ function handleQuickAction() {
             429限制: {{ poolStats.rate_limited_keys }}
           </n-tag>
 
-          <n-tag type="warning" v-if="poolStats.cooling_pool?.active_count > 0">
+          <n-tag type="warning" v-if="(poolStats.cooling_pool?.active_count || 0) > 0">
             <template #icon>
               <n-icon :component="FlashOutline" />
             </template>
-            冷却中: {{ poolStats.cooling_pool.active_count }}
+            冷却中: {{ poolStats.cooling_pool?.active_count || 0 }}
           </n-tag>
         </n-space>
       </div>

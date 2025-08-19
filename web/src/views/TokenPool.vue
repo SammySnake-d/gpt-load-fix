@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import { keysApi } from "@/api/keys";
 import { poolApi } from "@/api/pool";
 import PoolOverview from "@/components/pool/PoolOverview.vue";
 import PoolStats from "@/components/pool/PoolStats.vue";
 import RecoveryControl from "@/components/pool/RecoveryControl.vue";
 import RecoveryMonitor from "@/components/pool/RecoveryMonitor.vue";
 import type { Group, PoolStatsResponse, RecoveryMetrics } from "@/types/models";
-import { appState } from "@/utils/app-state";
 import { RefreshOutline } from "@vicons/ionicons5";
 import {
     NButton,
@@ -51,7 +51,7 @@ onUnmounted(() => {
 async function loadGroups() {
   try {
     loading.value = true;
-    groups.value = await appState.loadGroups();
+    groups.value = await keysApi.getGroups();
   } catch (error) {
     message.error("加载分组失败");
   } finally {
