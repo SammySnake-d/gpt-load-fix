@@ -296,14 +296,13 @@ func (s *SmartRecoveryStrategy) ValidateRecoveryConditions(key *models.APIKey, g
 		return fmt.Errorf("group not found")
 	}
 
-	// 检查分组配置
-	if group.EffectiveConfig == nil {
-		return fmt.Errorf("group effective config not found")
-	}
-
-	// 检查是否启用了自动恢复
-	if !group.EffectiveConfig.EnableAutoRecovery {
-		return fmt.Errorf("auto recovery is disabled for this group")
+	// 检查分组配置中是否启用了自动恢复
+	if group.Config != nil {
+		if autoRecovery, exists := group.Config["enable_auto_recovery"]; exists {
+			if enabled, ok := autoRecovery.(bool); ok && !enabled {
+				return fmt.Errorf("auto recovery is disabled for this group")
+			}
+		}
 	}
 
 	return nil

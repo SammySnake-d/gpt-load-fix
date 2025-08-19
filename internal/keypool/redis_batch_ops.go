@@ -34,14 +34,14 @@ func (p *RedisLayeredPool) ExecuteBatchOperations(operations []BatchOperation) e
 	if len(operations) == 0 {
 		return nil
 	}
-	
+
 	// 检查是否支持Pipeline
 	pipeliner, supportsPipeline := p.store.(store.RedisPipeliner)
 	if !supportsPipeline {
 		// 回退到逐个执行
 		return p.executeBatchSequentially(operations)
 	}
-	
+
 	// 使用Pipeline批量执行
 	return p.executeBatchWithPipeline(pipeliner, operations)
 }
@@ -49,28 +49,28 @@ func (p *RedisLayeredPool) ExecuteBatchOperations(operations []BatchOperation) e
 // executeBatchWithPipeline 使用Pipeline执行批量操作
 func (p *RedisLayeredPool) executeBatchWithPipeline(pipeliner store.RedisPipeliner, operations []BatchOperation) error {
 	pipe := pipeliner.Pipeline()
-	
+
 	// 构建Pipeline命令
 	for _, op := range operations {
 		if err := p.addOperationToPipeline(pipe, op); err != nil {
-			return NewPoolErrorWithCause(ErrorTypeInternal, "PIPELINE_BUILD_FAILED", 
+			return NewPoolErrorWithCause(ErrorTypeInternal, "PIPELINE_BUILD_FAILED",
 				"Failed to build pipeline operation", err)
 		}
 	}
-	
+
 	// 执行Pipeline
 	startTime := time.Now()
 	if err := pipe.Exec(); err != nil {
-		return NewPoolErrorWithCause(ErrorTypeStorage, "PIPELINE_EXEC_FAILED", 
+		return NewPoolErrorWithCause(ErrorTypeStorage, "PIPELINE_EXEC_FAILED",
 			"Failed to execute pipeline operations", err)
 	}
-	
+
 	duration := time.Since(startTime)
 	logrus.WithFields(logrus.Fields{
 		"operations": len(operations),
 		"duration":   duration,
 	}).Debug("Batch operations executed via pipeline")
-	
+
 	// 执行后处理
 	return p.postProcessBatchOperations(operations)
 }
@@ -96,13 +96,13 @@ func (p *RedisLayeredPool) addAddKeysOperationToPipeline(pipe store.Pipeliner, o
 	if len(op.KeyIDs) == 0 {
 		return nil
 	}
-	
+
 	// 默认添加到验证池
 	poolType := PoolTypeValidation
 	if op.ToPool != "" {
 		poolType = op.ToPool
 	}
-	
+
 	switch poolType {
 	case PoolTypeValidation:
 		validationKey := p.getRedisKey(op.GroupID, PoolTypeValidation)
@@ -111,24 +111,24 @@ func (p *RedisLayeredPool) addAddKeysOperationToPipeline(pipe store.Pipeliner, o
 			members[i] = keyID
 		}
 		pipe.SAdd(validationKey, members...)
-		
+
 	case PoolTypeReady:
 		readyKey := p.getRedisKey(op.GroupID, PoolTypeReady)
 		for _, keyID := range op.KeyIDs {
 			pipe.LPush(readyKey, keyID)
 		}
-		
+
 	case PoolTypeActive:
 		activeKey := p.getRedisKey(op.GroupID, PoolTypeActive)
 		for _, keyID := range op.KeyIDs {
 			pipe.LPush(activeKey, keyID)
 		}
-		
+
 	case PoolTypeCooling:
 		// 冷却池需要特殊处理，不应该直接添加
 		return NewPoolError(ErrorTypeValidation, "INVALID_POOL_TYPE", "Cannot directly add keys to cooling pool")
 	}
-	
+
 	return nil
 }
 
@@ -137,10 +137,10 @@ func (p *RedisLayeredPool) addRemoveKeysOperationToPipeline(pipe store.Pipeliner
 	if len(op.KeyIDs) == 0 {
 		return nil
 	}
-	
+
 	// 从所有池中移除
 	poolTypes := []PoolType{PoolTypeValidation, PoolTypeReady, PoolTypeActive}
-	
+
 	for _, poolType := range poolTypes {
 		switch poolType {
 		case PoolTypeValidation:
@@ -150,7 +150,7 @@ func (p *RedisLayeredPool) addRemoveKeysOperationToPipeline(pipe store.Pipeliner
 				members[i] = keyID
 			}
 			pipe.SRem(validationKey, members...)
-			
+
 		case PoolTypeReady, PoolTypeActive:
 			poolKey := p.getRedisKey(op.GroupID, poolType)
 			for _, keyID := range op.KeyIDs {
@@ -158,14 +158,14 @@ func (p *RedisLayeredPool) addRemoveKeysOperationToPipeline(pipe store.Pipeliner
 			}
 		}
 	}
-	
+
 	// 删除密钥详情
 	for _, keyID := range op.KeyIDs {
-		detailsKey := p.getKeyDetailsKey(keyID)
+		_ = p.getKeyDetailsKey(keyID)
 		// 注意：Pipeline接口需要扩展以支持DEL操作
 		// 暂时在后处理中删除
 	}
-	
+
 	return nil
 }
 
@@ -174,7 +174,7 @@ func (p *RedisLayeredPool) addMoveKeysOperationToPipeline(pipe store.Pipeliner, 
 	if len(op.KeyIDs) == 0 || op.FromPool == op.ToPool {
 		return nil
 	}
-	
+
 	// 从源池移除
 	switch op.FromPool {
 	case PoolTypeValidation:
@@ -184,14 +184,14 @@ func (p *RedisLayeredPool) addMoveKeysOperationToPipeline(pipe store.Pipeliner, 
 			members[i] = keyID
 		}
 		pipe.SRem(validationKey, members...)
-		
+
 	case PoolTypeReady, PoolTypeActive:
 		fromKey := p.getRedisKey(op.GroupID, op.FromPool)
 		for _, keyID := range op.KeyIDs {
 			pipe.LRem(fromKey, 0, keyID)
 		}
 	}
-	
+
 	// 添加到目标池
 	switch op.ToPool {
 	case PoolTypeValidation:
@@ -201,13 +201,13 @@ func (p *RedisLayeredPool) addMoveKeysOperationToPipeline(pipe store.Pipeliner, 
 			members[i] = keyID
 		}
 		pipe.SAdd(validationKey, members...)
-		
+
 	case PoolTypeReady, PoolTypeActive:
 		toKey := p.getRedisKey(op.GroupID, op.ToPool)
 		for _, keyID := range op.KeyIDs {
 			pipe.LPush(toKey, keyID)
 		}
-		
+
 	case PoolTypeCooling:
 		// 冷却池需要特殊处理
 		if coolData, ok := op.Metadata.(map[uint]time.Time); ok {
@@ -223,7 +223,7 @@ func (p *RedisLayeredPool) addMoveKeysOperationToPipeline(pipe store.Pipeliner, 
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -237,11 +237,11 @@ func (p *RedisLayeredPool) addSyncKeysOperationToPipeline(pipe store.Pipeliner, 
 func (p *RedisLayeredPool) executeBatchSequentially(operations []BatchOperation) error {
 	for i, op := range operations {
 		if err := p.executeSingleOperation(op); err != nil {
-			return NewPoolErrorWithCause(ErrorTypeStorage, "SEQUENTIAL_EXEC_FAILED", 
+			return NewPoolErrorWithCause(ErrorTypeStorage, "SEQUENTIAL_EXEC_FAILED",
 				fmt.Sprintf("Failed to execute operation %d", i), err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -278,7 +278,7 @@ func (p *RedisLayeredPool) postProcessBatchOperations(operations []BatchOperatio
 					logrus.WithFields(logrus.Fields{"keyID": keyID, "error": err}).Warn("Failed to delete key details")
 				}
 			}
-			
+
 		case BatchOpSyncKeys:
 			// 同步密钥详情
 			if err := p.syncKeysFromDatabase(op.GroupID, op.KeyIDs); err != nil {
@@ -290,7 +290,7 @@ func (p *RedisLayeredPool) postProcessBatchOperations(operations []BatchOperatio
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -299,18 +299,18 @@ func (p *RedisLayeredPool) syncKeysFromDatabase(groupID uint, keyIDs []uint) err
 	if len(keyIDs) == 0 {
 		return nil
 	}
-	
+
 	var keys []models.APIKey
 	if err := p.db.Where("id IN ? AND group_id = ?", keyIDs, groupID).Find(&keys).Error; err != nil {
 		return NewPoolErrorWithCause(ErrorTypeStorage, "DB_QUERY_FAILED", "Failed to query keys from database", err)
 	}
-	
+
 	for _, key := range keys {
 		if err := p.syncKeyDetailsToRedis(key.ID, key.GroupID); err != nil {
 			logrus.WithFields(logrus.Fields{"keyID": key.ID, "error": err}).Warn("Failed to sync key details to Redis")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -319,7 +319,7 @@ func (p *RedisLayeredPool) BatchAddKeys(groupID uint, keyIDs []uint, poolType Po
 	if len(keyIDs) == 0 {
 		return nil
 	}
-	
+
 	operations := []BatchOperation{
 		{
 			Type:    BatchOpAddKeys,
@@ -333,7 +333,7 @@ func (p *RedisLayeredPool) BatchAddKeys(groupID uint, keyIDs []uint, poolType Po
 			KeyIDs:  keyIDs,
 		},
 	}
-	
+
 	return p.ExecuteBatchOperations(operations)
 }
 
@@ -342,7 +342,7 @@ func (p *RedisLayeredPool) BatchMoveKeys(groupID uint, keyIDs []uint, fromPool, 
 	if len(keyIDs) == 0 || fromPool == toPool {
 		return nil
 	}
-	
+
 	operations := []BatchOperation{
 		{
 			Type:     BatchOpMoveKeys,
@@ -352,6 +352,6 @@ func (p *RedisLayeredPool) BatchMoveKeys(groupID uint, keyIDs []uint, fromPool, 
 			ToPool:   toPool,
 		},
 	}
-	
+
 	return p.ExecuteBatchOperations(operations)
 }

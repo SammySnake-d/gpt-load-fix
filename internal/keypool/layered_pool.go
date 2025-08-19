@@ -41,6 +41,7 @@ type LayeredKeyPool interface {
 
 	// 状态查询
 	GetPoolStats(groupID uint) (*PoolStats, error)
+	GetStats() (*PoolStats, error)
 	GetKeyStatus(keyID uint) (KeyStatus, error)
 	ListKeys(groupID uint, poolType PoolType) ([]uint, error)
 

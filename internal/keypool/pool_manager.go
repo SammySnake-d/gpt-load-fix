@@ -341,12 +341,12 @@ func (pm *PoolManager) IsPoolActive(groupID uint) bool {
 }
 
 // GetDefaultPoolType 获取默认池类型
-func (pm *PoolManager) GetDefaultPoolType() PoolType {
+func (pm *PoolManager) GetDefaultPoolType() ManagerPoolType {
 	return pm.defaultPoolType
 }
 
 // SetDefaultPoolType 设置默认池类型
-func (pm *PoolManager) SetDefaultPoolType(poolType PoolType) {
+func (pm *PoolManager) SetDefaultPoolType(poolType ManagerPoolType) {
 	pm.defaultPoolType = poolType
 	logrus.WithField("poolType", poolType).Info("Default pool type updated")
 }

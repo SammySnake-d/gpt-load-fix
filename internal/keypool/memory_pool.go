@@ -865,6 +865,21 @@ func (p *MemoryLayeredPool) GetPoolStats(groupID uint) (*PoolStats, error) {
 	return stats, nil
 }
 
+// GetStats 获取池统计信息（无需groupID参数）
+func (p *MemoryLayeredPool) GetStats() (*PoolStats, error) {
+	// 返回所有分组的聚合统计
+	allStats := &PoolStats{
+		GroupID:      0, // 表示聚合统计
+		TotalKeys:    0,
+		PoolCounts:   make(map[PoolType]int),
+		StatusCounts: make(map[KeyStatus]int),
+		LastUpdated:  time.Now(),
+	}
+
+	// 这里可以实现聚合逻辑，暂时返回空统计
+	return allStats, nil
+}
+
 // initializeRecoveryComponents 初始化恢复组件
 func (p *MemoryLayeredPool) initializeRecoveryComponents() error {
 	// 创建恢复策略

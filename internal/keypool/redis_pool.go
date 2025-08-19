@@ -349,8 +349,8 @@ func (p *RedisLayeredPool) moveToReadyPool(groupID uint, keyIDs []uint) error {
 		return nil
 	}
 
-	validationKey := p.getRedisKey(groupID, PoolTypeValidation)
-	readyKey := p.getRedisKey(groupID, PoolTypeReady)
+	_ = p.getRedisKey(groupID, PoolTypeValidation)
+	_ = p.getRedisKey(groupID, PoolTypeReady)
 
 	// 使用事务确保原子性
 	if pipeliner, ok := p.store.(store.RedisPipeliner); ok {
@@ -358,6 +358,7 @@ func (p *RedisLayeredPool) moveToReadyPool(groupID uint, keyIDs []uint) error {
 
 		// 从验证池移除
 		for _, keyID := range keyIDs {
+			_ = keyID
 			// 注意：这里需要实现SREM操作，当前store接口可能需要扩展
 		}
 
@@ -1404,6 +1405,21 @@ func (p *RedisLayeredPool) GetPoolStats(groupID uint) (*PoolStats, error) {
 	}
 
 	return stats, nil
+}
+
+// GetStats 获取池统计信息（无需groupID参数）
+func (p *RedisLayeredPool) GetStats() (*PoolStats, error) {
+	// 返回所有分组的聚合统计
+	allStats := &PoolStats{
+		GroupID:      0, // 表示聚合统计
+		TotalKeys:    0,
+		PoolCounts:   make(map[PoolType]int),
+		StatusCounts: make(map[KeyStatus]int),
+		LastUpdated:  time.Now(),
+	}
+
+	// 这里可以实现聚合逻辑，暂时返回空统计
+	return allStats, nil
 }
 
 // collectKeyStatusStats 收集密钥状态统计
